@@ -763,7 +763,7 @@ function rail(){const f=F(),k=kind();if(!k)return'';const r=risks();let money=''
    Дальше: ApiStore — свой сервер с логином и паролем для продажи пульта
    (те же методы поверх /api/meetings), UI и данные встречи не меняются.
    ===================================================================== */
-const CFG={backend:'google',clientId:'__CLIENT_ID__',scopes:'https://www.googleapis.com/auth/drive.file openid email',sheetTitle:'Пульт встреч — данные',schema:1};
+const CFG={backend:'google',clientId:'284976775133-0uffcvaarup36uscm90thiv2np4rnkhm.apps.googleusercontent.com',scopes:'https://www.googleapis.com/auth/drive.file openid email',sheetTitle:'Пульт встреч — данные',schema:1};
 const CLOUD_OK=location.protocol==='https:'&&self===top&&!/claude\.ai|claudeusercontent/.test(location.hostname);
 const G={get:(k,d)=>{try{const v=localStorage.getItem('vs_g_'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set:(k,v)=>{try{localStorage.setItem('vs_g_'+k,JSON.stringify(v));}catch(e){}}};
 const cid=()=>(CFG.clientId&&!CFG.clientId.startsWith('__')?CFG.clientId:G.get('cid',''));
