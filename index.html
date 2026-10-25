@@ -1,0 +1,915 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#d3202a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Встречи">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Встречи с клиентами</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: sticky header (client + stage tabs); laptop = stage content + right rail with live summary; phone = one column. Client map is a separate red/white sheet that prints on one A4. */
+:root{
+  --bg:#ffffff; --surface:#f7f3f3; --line:#e6dcdc; --fg:#1d1617; --muted:#6f6264;
+  --accent:#d3202a; --accent-soft:#fde8e9; --on-accent:#ffffff;
+  --ok:#1d7a46; --ok-soft:#e3f3ea; --warn:#a85d00; --warn-soft:#fff1dc;
+  --display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --body:"Golos Text",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141011; --surface:#1f191a; --line:#352b2c; --fg:#f3eded; --muted:#a8999b;
+  --accent:#ff4d55; --accent-soft:#3a1517; --on-accent:#ffffff;
+  --ok:#5fd394; --ok-soft:#14301f; --warn:#ffb54d; --warn-soft:#33240f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141011; --surface:#1f191a; --line:#352b2c; --fg:#f3eded; --muted:#a8999b;
+  --accent:#ff4d55; --accent-soft:#3a1517; --on-accent:#ffffff;
+  --ok:#5fd394; --ok-soft:#14301f; --warn:#ffb54d; --warn-soft:#33240f; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1280px;margin:0 auto}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-block:10px 0}
+.brand{font-family:var(--display);font-weight:700;font-size:15px;white-space:nowrap}
+.brand i{font-style:normal;color:var(--accent)}
+.who{flex:1 1 200px;min-width:0;color:var(--muted);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who b{color:var(--fg)}
+.ibtn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:7px 11px;cursor:pointer;font-weight:600;font-size:13px}
+.ibtn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding-block:10px 8px}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;border:1px solid var(--line);background:transparent;border-radius:999px;padding:7px 12px;cursor:pointer;font-weight:600;font-size:14px;display:flex;gap:6px;align-items:center}
+.tab b{font-family:var(--display);font-size:10px;color:var(--muted);font-weight:500}
+.tab.active{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.tab.active b{color:inherit;opacity:.7}
+.tab.client{border-color:var(--accent);color:var(--accent)}
+.tab.client.active{background:var(--accent);color:var(--on-accent)}
+
+main{padding-block:18px 56px}
+.layout{display:block}
+.panel>*+*{margin-top:14px}
+h2{font-family:var(--display);font-weight:700;font-size:20px;margin:0;text-wrap:balance}
+h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 8px;font-weight:600}
+.lead{color:var(--muted);margin:4px 0 0;max-width:64ch}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.say{font-size:16px;line-height:1.5;padding:12px 14px;background:var(--bg);border:1px solid var(--line);border-radius:12px}
+.say+.say{margin-top:8px}
+.nm{color:var(--accent);font-weight:700}
+.tip{background:var(--warn-soft);border-radius:12px;padding:10px 12px;font-size:14px}
+.tip b{color:var(--warn)}
+.note{font-size:12px;color:var(--muted)}
+.empty{color:var(--muted);font-size:14px}
+
+/* question items */
+.it{padding:11px 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px;min-width:0}
+.it:first-child{border-top:0;padding-top:2px}
+.it .q{font-weight:600}
+.it .h{color:var(--muted);font-size:13px;margin-top:-3px}
+.it input[type=text],.it textarea{border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:8px 10px;width:100%;min-width:0;font-size:15px}
+.it textarea{min-height:58px;resize:vertical}
+.it input.num{max-width:240px;font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:6px 12px;cursor:pointer;font-size:14px;font-weight:500}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.chk{display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-weight:600}
+.chk input{width:22px;height:22px;accent-color:var(--accent);margin:0;flex:0 0 auto}
+.chk.done span{color:var(--muted);text-decoration:line-through}
+.chk small{display:block;font-weight:400;color:var(--muted);font-size:13px;text-decoration:none}
+.utp .chk span{font-weight:400;font-size:15px}
+.utp .chk span b{display:block;font-weight:700}
+
+.cols{display:grid;gap:14px}
+.res{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.r{border-radius:12px;padding:12px;background:var(--bg);border:1px solid var(--line)}
+.r span{display:block;font-size:12px;color:var(--muted)}
+.r b{font-family:var(--display);font-weight:500;font-size:20px;font-variant-numeric:tabular-nums}
+.r.key{background:var(--accent-soft);border-color:var(--accent)}
+.r.good{background:var(--ok-soft);border-color:var(--ok)}
+.ledger{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.ledger td{padding:8px 0;border-top:1px solid var(--line);vertical-align:top}
+.ledger td:last-child{text-align:right;white-space:nowrap;padding-left:12px;font-weight:600}
+.ledger td small{display:block;color:var(--muted);font-size:12px;font-weight:400}
+.ledger tr.total td{border-top:2px solid var(--fg);font-weight:700;font-size:17px}
+
+/* price corridor */
+.corr{position:relative;height:64px;margin:8px 4px 4px}
+.corr .band{position:absolute;top:26px;height:12px;border-radius:6px;background:var(--ok-soft);border:1px solid var(--ok)}
+.corr .axis{position:absolute;top:31px;left:0;right:0;height:2px;background:var(--line)}
+.mk{position:absolute;top:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.mk i{width:2px;height:38px;background:currentColor;margin-top:2px}
+.mk.exp{color:var(--accent)} .mk.ad{color:var(--warn)}
+.corr .lb{position:absolute;top:44px;font-size:11px;color:var(--muted);transform:translateX(-50%);white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* risks */
+.risks{display:flex;flex-direction:column;gap:6px}
+.risk{border-left:3px solid var(--accent);background:var(--bg);border-radius:0 10px 10px 0;padding:8px 10px;font-size:14px}
+.risk.ok{border-left-color:var(--ok)}
+
+details.obj{border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+details.obj+details.obj{margin-top:8px}
+details.obj summary{cursor:pointer;padding:12px 14px;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:10px}
+details.obj summary::-webkit-details-marker{display:none}
+details.obj summary::after{content:"+";color:var(--accent)}
+details.obj[open] summary::after{content:"−"}
+details.obj .in{padding:0 14px 14px}
+details.obj .in p{margin:0} details.obj .in p+p{margin-top:8px}
+details.obj .in em{font-style:normal;color:var(--muted);font-size:12px;display:block;text-transform:uppercase;letter-spacing:.06em}
+
+.rail{display:none}
+.out{white-space:pre-wrap;font-size:14px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;max-height:420px;overflow:auto}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.arch{display:flex;flex-direction:column;gap:6px}
+.arch div{display:flex;justify-content:space-between;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:14px}
+.arch div span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ===== client map: own fixed red/white palette, same in both themes ===== */
+.sheet{--p-red:#d3202a;--p-ink:#1d1617;--p-mut:#6b5f61;--p-line:#eadede;--p-soft:#fdf0f0;
+  background:#fff;color:var(--p-ink);border-radius:16px;border:1px solid var(--line);overflow:hidden;max-width:820px;margin:0 auto}
+.sh-head{background:var(--p-red);color:#fff;padding:22px 24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.ava{width:68px;height:68px;border-radius:50%;background:#fff;color:var(--p-red);display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:20px;overflow:hidden;flex:0 0 auto;border:3px solid rgba(255,255,255,.6)}
+.ava img{width:100%;height:100%;object-fit:cover}
+.sh-head .t{flex:1 1 240px;min-width:0}
+.sh-head .k{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.85}
+.sh-head h1{font-family:var(--display);font-weight:700;font-size:22px;margin:4px 0 2px;line-height:1.2;text-wrap:balance}
+.sh-head .s{font-size:14px;opacity:.92}
+.sh-body{padding:20px 24px;display:flex;flex-direction:column;gap:18px}
+.sh-sec h4{font-family:var(--display);font-size:13px;font-weight:700;color:var(--p-red);margin:0 0 8px;letter-spacing:.02em;text-transform:uppercase}
+.goal{font-size:16px;line-height:1.5;background:var(--p-soft);border-radius:12px;padding:12px 14px}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.steps li{display:grid;grid-template-columns:100px 1fr;gap:12px;padding:9px 0;border-top:1px solid var(--p-line)}
+.steps li:first-child{border-top:0}
+.steps .when{font-weight:700;color:var(--p-red);font-size:13px}
+.steps .what b{display:block}
+.steps .what span{color:var(--p-mut);font-size:14px}
+.docs{columns:2;column-gap:24px;margin:0;padding:0;list-style:none}
+.docs li{break-inside:avoid;padding:4px 0 4px 24px;position:relative;font-size:14px}
+.docs li::before{content:"";position:absolute;left:0;top:7px;width:13px;height:13px;border:2px solid var(--p-red);border-radius:3px}
+.docs li small{color:var(--p-mut)}
+.money{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.money div{border:1px solid var(--p-line);border-radius:12px;padding:10px 12px}
+.money span{display:block;font-size:12px;color:var(--p-mut)}
+.money b{font-family:var(--display);font-weight:500;font-size:18px;font-variant-numeric:tabular-nums}
+.money .hl{background:var(--p-red);border-color:var(--p-red);color:#fff}
+.money .hl span{color:#fff;opacity:.85}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.duo ul{margin:0;padding-left:18px;font-size:14px}
+.duo li+li{margin-top:4px}
+.guar{border:2px solid var(--p-red);border-radius:12px;padding:12px 14px;font-size:14px}
+.guar b{color:var(--p-red)}
+.sh-foot{border-top:1px solid var(--p-line);padding:14px 24px;display:flex;flex-wrap:wrap;gap:6px 22px;font-size:14px;align-items:center}
+.sh-foot b{font-family:var(--display);font-weight:700;color:var(--p-red);margin-right:auto}
+.sh-foot small{display:block;width:100%;color:var(--p-mut);font-size:11px}
+
+@media (max-width:600px){.docs{columns:1}.duo{grid-template-columns:1fr}.steps li{grid-template-columns:1fr;gap:2px}.sh-head,.sh-body,.sh-foot{padding-left:16px;padding-right:16px}}
+@media (min-width:1000px){
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:22px;align-items:start}
+  .rail{display:block;position:sticky;top:calc(env(safe-area-inset-top,0px) + 110px);max-height:calc(100vh - 128px);overflow:auto}
+  .rail>*+*{margin-top:12px}
+  .layout.wide{grid-template-columns:minmax(0,1fr)}
+  .layout.wide .rail{display:none}
+  .cols{grid-template-columns:1fr 1fr}
+}
+@media print{
+  @page{size:A4;margin:10mm}
+  body{background:#fff}
+  header,.rail,.noprint,.panel>:not(.sheet){display:none!important}
+  main{padding:0}
+  .sheet{border:0;border-radius:0;max-width:none;font-size:12px}
+  .sheet .sh-head{-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:14px 18px}
+  .sheet .money .hl,.goal{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .sh-body{padding:10px 18px;gap:8px}
+  .sh-head h1{font-size:17px} .ava{width:50px;height:50px;font-size:16px}
+  .sh-sec h4{font-size:11px;margin-bottom:4px}
+  .goal{font-size:12px;padding:7px 10px}
+  .steps li{grid-template-columns:92px 1fr;padding:3px 0;gap:8px}
+  .steps .when{font-size:10.5px}
+  .steps .what b{display:inline;font-size:12px} .steps .what b::after{content:" — "}
+  .steps .what span{font-size:11px}
+  .docs li{font-size:11px;padding:2px 0 2px 20px} .docs li::before{top:4px;width:10px;height:10px}
+  .money div{padding:6px 10px} .money b{font-size:14px}
+  .guar{font-size:11px;padding:8px 10px}
+  .sh-foot{padding:8px 18px;font-size:12px}
+  .full-only{display:none!important}
+}
+@media (prefers-reduced-motion:no-preference){.tab,.chip{transition:background .15s,color .15s,border-color .15s}}
+</style>
+
+</head><body>
+<style>
+.cloud.ok{color:var(--ok)}.cloud.warn{color:var(--accent);border-color:var(--accent)}
+a.ibtn{text-decoration:none;color:var(--fg);display:inline-block}
+.typechip{font-size:12px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:8px;padding:4px 8px;white-space:nowrap}
+.start{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.tcard{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:14px;cursor:pointer;display:flex;flex-direction:column;gap:4px;min-width:0}
+.tcard:hover{border-color:var(--accent)}
+.tcard b{font-family:var(--display);font-weight:700;font-size:15px}
+.tcard span{color:var(--muted);font-size:13px}
+.tcard i{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.logo{height:26px;width:auto;display:block;margin-left:auto;align-self:flex-start}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stats div{border:1px solid var(--p-line);border-radius:12px;padding:10px;text-align:center}
+.stats b{display:block;font-family:var(--display);font-size:22px;font-weight:500;color:var(--p-red)}
+.stats span{font-size:12px;color:var(--p-mut)}
+@media (max-width:600px){.stats{grid-template-columns:1fr 1fr}.logo{margin-left:0}}
+@media print{.logo{height:20px}.stats b{font-size:16px}.stats div{padding:5px}}
+</style>
+
+<header>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">Встречи <i>с клиентами</i></div>
+      <span class="typechip" id="typechip" hidden></span>
+      <div class="who" id="who"></div>
+      <button class="ibtn cloud" id="cloud" type="button" hidden></button><button class="ibtn" id="setBtn" type="button" aria-label="Настройки">Настройки</button><button class="ibtn" id="newMeet" type="button">Новая встреча</button>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Этапы встречи"></nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="layout" id="layout">
+    <section class="panel" id="panel"></section>
+    <aside class="rail" id="rail"></aside>
+  </div>
+</main>
+
+<script>
+(function(){
+const LOGO='data:image/png;base64,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', MEPHOTO='data:image/jpeg;base64,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';
+const DEFAULT_ME={name:'Иван Прибыток',role:'Специалист по недвижимости · Этажи Кемерово',phone:'+7 961 706-00-77',tg:'@ivan_Pribytok',site:'ivan.ipoteka42.ru',office:'пр. Ленина, 59/1, 3 этаж',photo:''};
+const ME=()=>{const p=Object.assign({},DEFAULT_ME);Object.entries(S.profile||{}).forEach(([k,v])=>{if(v)p[k]=v;});return p;};
+
+/* ================= TYPES ================= */
+const TYPES={
+ so:{label:'Продавец в офисе',kind:'sell',when:'Собственник после холодного звонка пришёл в офис',tabs:['prep','contact','sit','obj','docs','price','pres','calc','objn','deal','map','sum']},
+ ss:{label:'Продавец на объекте',kind:'sell',when:'Едешь к собственнику: осмотр, фото, договор на месте',tabs:['prep','door','walk','sit','docs','price','pres','calc','objn','deal','map','sum']},
+ bu:{label:'Покупатель',kind:'buy',when:'Дежурство, входящий звонок, клиент на покупку вторички',tabs:['bprep','bcontact','bneed','bmoney','bpres','bcalc','bobjn','bdeal','map','sum'],def:{gp:'4000',term:'20'}},
+ ex:{label:'Обмен',kind:'ex',when:'Продать своё и купить новое одной сделкой',tabs:['prep','contact','sit','obj','docs','price','bneed','bmoney','xpres','xcalc','objn','deal','map','sum'],def:{gp:'4000',term:'20'}},
+ rv:{label:'Встреча о цене',kind:'rev',when:'Через 3 недели рекламы: отчёт и решение по цене',tabs:['rprep','rcontact','rstats','rtalk','robjn','rdeal','map','sum']},
+ nb:{label:'Новостройка',kind:'nb',when:'Покупка в новостройке: подбор ЖК, бронь, ипотека',tabs:['bprep','bcontact','nneed','bmoney','npres','bcalc','nobjn','ndeal','map','sum'],def:{gp:'4000',term:'20',seg:'Новостройка'}},
+ ih:{label:'Наследство и доли',kind:'sell',when:'Продажа унаследованного, несколько собственников',tabs:['prep','contact','sit','inh','obj','docs','price','pres','calc','objn','deal','map','sum'],def:{basis:'Наследство'}}};
+const TL={prep:'Подготовка',contact:'Контакт',door:'Знакомство',walk:'Осмотр',sit:'Ситуация',inh:'Наследство',obj:'Объект',docs:'Документы',price:'Цена',pres:'Презентация',calc:'Расчёт',objn:'Возражения',deal:'Договор',
+ bprep:'Подготовка',bcontact:'Контакт',bneed:'Потребности',nneed:'Потребности',bmoney:'Деньги',bpres:'Презентация',npres:'Презентация',bcalc:'Расчёт',bobjn:'Возражения',nobjn:'Возражения',bdeal:'Договор',ndeal:'Договор',
+ xpres:'Презентация',xcalc:'Расчёт обмена',rprep:'Подготовка',rcontact:'Контакт',rstats:'Цифры',rtalk:'Разговор о цене',robjn:'Возражения',rdeal:'Решение',map:'Карта клиента',sum:'Итог для меня',set:'Настройки'};
+
+/* ================= SCHEMA ================= */
+const ch=(id,q,o,h,x)=>Object.assign({id,q,t:'one',o,h},x||{});
+const tx=(id,q,h,x)=>Object.assign({id,q,t:'text',h},x||{});
+const ta=(id,q,h,x)=>Object.assign({id,q,t:'area',h},x||{});
+const nu=(id,q,h,x)=>Object.assign({id,q,t:'num',h},x||{});
+const mu=(id,q,o,h,x)=>Object.assign({id,q,t:'many',o,h},x||{});
+const ck=(id,q)=>({id,q,t:'check'});
+const SCH={
+ prep:[tx('name','Имя клиента'),tx('phone','Телефон / MAX / Telegram'),tx('addr','Адрес объекта'),
+  ch('src','Откуда клиент',['Авито','ЦИАН','Домклик','Расклейка','Рекомендация','Другое']),
+  ta('callnote','Что знаю после звонка','Боль, мотив, что зацепило'),
+  nu('adprice','Цена в объявлении, ₽'),nu('days','Сколько дней висит объявление'),
+  nu('mktMin','Рыночный коридор: от, ₽','Аналитическая справка Космоса или тепловая карта Росреестра (сделки этого года)'),nu('mktMax','Рыночный коридор: до, ₽'),
+  nu('comp','Сколько конкурентов в доме / районе')],
+ sit:[mu('why','Почему решили продавать?',['Обмен на большую','Обмен на меньшую','Переезд в другой город','Купили другое жильё','Нужны деньги','Наследство','Разъезд','Другое']),
+  ta('whyTxt','Его словами',''),
+  ch('buyNext','Что покупаете взамен?',['Пока не решили','Вторичку','Новостройку','Дом','Ничего'],'Если покупает — это ещё и заявка на покупателя'),
+  tx('deadline','К какому сроку важно продать?'),
+  ta('pain','Что будет, если не продадите к этому сроку?','Это боль клиента — используй её в презентации'),
+  mu('decide','Кто ещё принимает решение?',['Только он(а)','Супруг(а)','Дети / родители','Совладельцы']),
+  ta('tried','Пробовали продавать сами? Сколько было звонков и показов?','Что не устроило — это аргумент за нас'),
+  mu('important','Что для вас самое важное в продаже?',['Цена','Скорость','Безопасность','Чтобы не дёргали','Документы без проблем']),
+  ta('fear','Чего опасаетесь?','')],
+ inh:[tx('inhDate','Когда открылось наследство','С этой даты считается срок владения для налога'),
+  ch('inhStatus','Что с оформлением',['Свидетельство получено, право зарегистрировано','У нотариуса, в процессе','Ещё не обращались']),
+  nu('heirs','Сколько наследников / собственников'),
+  ch('heirsAgree','Все согласны продавать?',['Все согласны','Есть несогласные','Не со всеми есть связь']),
+  tx('heirsWhere','Где живут остальные наследники','Другой город — доверенность или онлайн-подписание'),
+  ch('split','Как планируете делить деньги',['Пропорционально долям','Один выкупает доли','Ещё не решили']),
+  ta('inhNote','Нюансы (долги наследодателя, споры, прописанные)','')],
+ obj:[ch('rooms','Комнат',['Студия','1','2','3','4+']),nu('area','Площадь, м²'),tx('floor','Этаж / этажность'),
+  ch('house','Дом',['Панель','Кирпич','Монолит','Дерево']),
+  ch('state','Состояние',['Без ремонта','Косметика','Хороший ремонт','Дизайнерский']),tx('repYear','Когда делали ремонт'),
+  ch('replan','Перепланировка',['Нет','Есть, узаконена','Есть, не узаконена']),
+  ch('furn','Мебель и техника',['Оставляют','Забирают','Частично']),
+  ta('plus','Что вам больше всего нравится в квартире?','Это пойдёт в продающее описание'),
+  ta('minus','Что покупатели могут отметить как минус?','')],
+ walk:[tx('wKitchen','Кухня: что подчеркнуть'),tx('wRooms','Комнаты: свет, вид, планировка'),tx('wBath','Санузел: состояние'),tx('wBalc','Балкон / лоджия'),
+  tx('wYard','Подъезд, двор, парковка'),tx('wNeigh','Соседи, шум'),nu('wUtil','Коммуналка зимой, ₽/мес','Покупатели всегда спрашивают')],
+ docs:[nu('owners','Сколько собственников'),
+  ch('basis','На основании чего собственность',['Купля-продажа','Наследство','Приватизация','ДДУ','Дарение','Мена']),
+  nu('years','Сколько лет владеете'),nu('buyPrice','За сколько покупали, ₽','Нужно для расчёта налога',{show:f=>f.basis==='Купля-продажа'||f.basis==='ДДУ'}),
+  ch('onlyHome','Это ваше единственное жильё?',['Да','Нет'],'Влияет на срок владения без налога'),
+  ch('spouse','Куплено в браке?',['Нет','Да']),
+  ch('msk','Использовали материнский капитал?',['Нет','Да, доли выделены','Да, доли не выделены']),
+  ch('minors','Есть несовершеннолетние собственники?',['Нет','Да']),
+  ch('mort','Квартира в ипотеке / обременение?',['Нет','Да']),
+  tx('mortBank','Банк',null,{show:f=>f.mort==='Да'}),nu('mortLeft','Остаток долга, ₽',null,{show:f=>f.mort==='Да'}),
+  nu('reg','Сколько человек прописано'),
+  ch('debts','Есть долги за ЖКХ / капремонт?',['Нет','Есть']),
+  mu('have','Какие документы на руках',['Выписка ЕГРН','Свидетельство','Договор-основание','Техпаспорт / план'])],
+ price:[nu('expect','Какую цену хотите получить?'),nu('min','Ниже какой суммы точно не готовы?','Не озвучивать в рекламе'),
+  ch('strat','Стратегия',['В рынке','Тест 3 недели выше рынка','Быстрая продажа'],'«Тестируем 3 недели, потом возвращаемся к цене»')],
+ deal:[ch('contract','Агентский договор',['Эксклюзивный','Стандартный','Пока не подписали']),ck('pdn','Согласие на обработку персональных данных'),ck('lk','Зарегистрирован в личном кабинете'),
+  tx('viewDate','Осмотр объекта — когда'),tx('photoDate','Фотосессия — когда'),tx('nextContact','Следующий контакт — когда и как'),
+  ch('temp','Насколько горячий клиент',['Горячий','Тёплый','Холодный'],'Только для тебя, в карту клиента не попадает'),ta('extra','Что ещё важно (для меня)','')],
+
+ bprep:[tx('name','Имя клиента'),tx('phone','Телефон / MAX / Telegram'),
+  ch('src','Откуда клиент',['Дежурство','Входящий звонок','Авито','Рекомендация','Соцсети','Другое']),
+  ta('callnote','Что уже знаю','Что искал, на какое объявление звонил')],
+ bneed:[mu('bwhy','Для чего покупаете?',['Жить самим','Расширение','Отдельно от родителей','Для детей','Инвестиция','Переезд в Кемерово']),
+  ch('seg','Что рассматриваете',['Вторичка','Новостройка','Дом','Пока не знаю']),
+  mu('brooms','Комнат',['Студия','1','2','3','4+']),tx('barea','Площадь, этаж — пожелания'),
+  tx('district','Район','А почему именно этот?'),tx('who','Кто будет жить'),ch('kids','Дети',['Нет','1','2','3+']),
+  ch('bstate','Ремонт',['Неважно','Можно без ремонта','Нужен хороший ремонт']),
+  mu('bimp','Что для вас важно при выборе?',['Школа / садик рядом','Транспорт','Тихий двор','Парковка','Не первый / не последний этаж','Ремонт','Новый дом','Цена']),
+  ta('stop','Что точно не подходит?',''),tx('bdeadline','Когда хотите переехать?'),
+  ta('seen','Что уже смотрели? Что не понравилось?','Это экономит время на подборке'),
+  mu('decide','Кто ещё принимает решение?',['Только он(а)','Супруг(а)','Дети / родители'])],
+ nneed:[mu('bwhy','Для чего покупаете?',['Жить самим','Расширение','Для детей','Инвестиция','Переезд в Кемерово']),
+  tx('district','Район','А почему именно этот?'),mu('brooms','Комнат',['Студия','1','2','3','4+']),
+  ch('ready','Срок сдачи',['Дом сдан','Сдача в этом году','Сдача через 1–2 года','Неважно']),
+  ch('finish','Отделка',['Без отделки','Предчистовая','С ремонтом','Неважно']),
+  mu('bimp','Что важно',['Инфраструктура','Двор без машин','Паркинг','Вид','Надёжный застройщик','Цена за м²']),
+  ch('program','Ипотечная программа',['Семейная','IT','Базовая','Без ипотеки','Не знаю'],'Условия программ уточни в ипотечном отделе перед встречей'),
+  tx('who','Кто будет жить'),ch('kids','Дети',['Нет','1','2','3+']),tx('bdeadline','Когда хотите въехать?'),
+  ta('seen','Какие ЖК уже смотрели? Что понравилось, что нет?',''),
+  mu('decide','Кто ещё принимает решение?',['Только он(а)','Супруг(а)','Дети / родители'])],
+ bmoney:[mu('pay','Как планируете оплачивать?',['Наличные','Ипотека','Маткапитал','Сертификат / субсидия','Продажа своей']),
+  nu('budget','Бюджет на покупку, до ₽'),nu('own','Свои деньги (первый взнос), ₽'),
+  nu('mskSum','Маткапитал, ₽',null,{show:f=>arr(f.pay).includes('Маткапитал')}),nu('cert','Сертификат / субсидия, ₽',null,{show:f=>arr(f.pay).includes('Сертификат / субсидия')}),
+  ch('approved','Одобрение ипотеки',['Нет','Есть одобрение','Был отказ'],null,{show:f=>arr(f.pay).includes('Ипотека')}),tx('bank','В каком банке',null,{show:f=>f.approved==='Есть одобрение'||f.approved==='Был отказ'}),
+  nu('payWant','Комфортный платёж в месяц, ₽',null,{show:f=>arr(f.pay).includes('Ипотека')}),
+  nu('rate','Ставка для расчёта, %','Уточни в ипотечном отделе',{show:f=>arr(f.pay).includes('Ипотека')}),nu('term','Срок кредита, лет',null,{show:f=>arr(f.pay).includes('Ипотека')})],
+ bdeal:[ch('contract','Агентский договор на покупку',['Подписан','Пока нет']),ck('pdn','Согласие на обработку персональных данных'),ck('lk','Зарегистрирован в личном кабинете'),
+  ck('ipApp','Заявка в ипотечный отдел'),tx('podb','Подборку отправлю — когда'),tx('shows','Показы — когда'),tx('nextContact','Следующий контакт — когда и как'),
+  ch('temp','Насколько горячий клиент',['Горячий','Тёплый','Холодный'],'Только для тебя'),ta('extra','Что ещё важно (для меня)','')],
+ ndeal:[ch('contract','Агентский договор',['Подписан','Пока нет']),ck('pdn','Согласие на обработку персональных данных'),ck('lk','Зарегистрирован в личном кабинете'),
+  ck('ipApp','Заявка в ипотечный отдел'),ta('jk','ЖК в подборку','Акции застройщиков перепроверь по дэшборду перед отправкой'),tx('trip','Поездка по ЖК — когда'),tx('nextContact','Следующий контакт — когда и как'),
+  ch('temp','Насколько горячий клиент',['Горячий','Тёплый','Холодный'],'Только для тебя'),ta('extra','Что ещё важно (для меня)','')],
+
+ rprep:[tx('name','Имя собственника'),tx('phone','Телефон / MAX'),tx('addr','Адрес объекта'),tx('startDate','Дата старта рекламы'),
+  nu('curPrice','Текущая цена, ₽'),nu('rdays','Дней в рекламе'),nu('mktMin','Рыночный коридор: от, ₽','Обнови справку Космоса перед встречей'),nu('mktMax','Рыночный коридор: до, ₽')],
+ rstats:[nu('views','Просмотры объявлений'),nu('calls','Звонки'),nu('rshows','Показы'),
+  ta('feedback','Что говорили покупатели на показах','Дословно — это главный аргумент'),
+  nu('compNew','Новых конкурентов за период'),ta('compSold','Что продалось рядом и за сколько',''),nu('compAvg','Средняя цена похожих сейчас, ₽')],
+ rtalk:[ch('decision','Решение',['Держим цену','Снижаем цену','Меняем подачу']),nu('newPrice','Новая цена, ₽',null,{show:f=>f.decision==='Снижаем цену'}),
+  mu('changes','Что меняем в подаче',['Новые фото','Новое описание','Платные статусы','Подготовка квартиры к показам','Открытый показ','Баннер / расклейка'])],
+ rdeal:[tx('nextReport','Следующий отчёт — когда'),tx('nextContact','Следующий контакт — когда и как'),ch('temp','Настрой собственника',['Доверяет','Сомневается','Недоволен'],'Только для тебя'),ta('extra','Что ещё важно (для меня)','')]};
+
+/* ================= UTP ================= */
+const SELL_UTP=[
+ ['u_mkt','Маркетинг-план на 12 площадках','Для вашей квартиры составляем маркетинг-план: 12 площадок, в том числе платные, доп. статусы, закрытые риелторские чаты, соцсети, баннер и расклейка. О квартире узнают все покупатели района. Продаёте быстрее и дороже. Согласитесь, важно?'],
+ ['u_photo','Профессиональная фотосессия','Делаем профессиональную съёмку. Объекты с медиаконтентом продаются в 4 раза быстрее, а 87% покупателей готовы смотреть дороже своего бюджета, если фото хорошие. Больше звонков и сильнее позиция в торге. Согласны?'],
+ ['u_anal','Аналитика и еженедельный отчёт','Мы видим рынок на базе 800 тысяч проданных и 400 тысяч активных объектов. Цену ставим по фактам, каждую неделю — отчёт: звонки, показы, конкуренты. Не продешевите и не перестоите. Удобно?'],
+ ['u_audit','Бесплатный юридический аудит','Юристы бесплатно проверяют документы — и для наличных, и для ипотеки покупателя — и готовят договор в ваших интересах. Сделка не развалится на последнем шаге. Спокойнее?'],
+ ['u_neg','Я веду переговоры и показы','Звонки, показы и торг беру на себя, покупателей проверяю заранее. Вас не дёргают «просто посмотреть», а торг идёт по нашим правилам. Удобно?'],
+ ['u_lk','Личный кабинет','В личном кабинете вы видите каждое моё действие: рекламу, звонки, показы. Всегда в курсе без лишних звонков. Удобно?'],
+ ['u_gbs','Гарантия безопасности сделки','На сделке компания выдаёт гарантийный сертификат: финансовая и юридическая ответственность, пожизненно, до 15 млн ₽. Если что-то пойдёт не так, отвечает компания. Надёжно?'],
+ ['u_alt','Встречная сделка в один день','Параллельно подбираю вам новое жильё, и продажу с покупкой проводим одной сделкой в один день. Вы не останетесь без жилья и не будете жить на съёмной. Спокойнее?',f=>isAlt(f)],
+ ['u_doc','Доли детей и опека','Юристы сопровождают выделение долей и разрешение опеки. Сделка не сорвётся из-за бумаг, а вы не платите сторонним юристам. Важно?',f=>f.msk&&f.msk!=='Нет'||f.minors==='Да'],
+ ['u_inh','Наследство без нервов','Юристы проверяют наследственные документы и права всех наследников. Если кто-то в другом городе — оформим доверенность или онлайн-подписание. Всем удобно, и сделка чистая для покупателя. Согласны?',f=>f.basis==='Наследство'],
+ ['u_mort','Продажа с ипотекой','Наш ипотечный отдел согласует с банком погашение долга из денег покупателя и снятие обременения. Вам не нужно гасить ипотеку заранее. Удобно?',f=>f.mort==='Да']];
+const BUY_UTP=[
+ ['b_mort','Ипотека ниже, чем в банке','Наши ипотечные брокеры одобряют ипотеку по 2 документам и по ставке ниже, чем в банке напрямую. Платёж меньше, экономия до 250 тысяч в зависимости от суммы. Согласитесь, выгодно?',f=>arr(f.pay).includes('Ипотека')],
+ ['b_ins','Страховка дешевле на 30–40%','Мы партнёры всех аккредитованных страховых. Страховка по ипотеке выходит дешевле на 30–40% — каждый год это реальные деньги. Выгодно?',f=>arr(f.pay).includes('Ипотека')],
+ ['b_base','База 3000+ объектов','В базе компании больше 3000 объектов и 1500 квартир в новостройках, часть только у нас. Я подберу варианты под вашу задачу быстрее, чем вы найдёте сами. Согласны?'],
+ ['b_neg','Я веду переговоры и торг','С продавцом и его риелтором договариваюсь я: о цене, сроках, условиях. Вы не переплачиваете и не тратите нервы. Удобно?'],
+ ['b_check','Проверка квартиры юристом','Перед задатком юристы проверяют квартиру: собственников, обременения, историю. Вы не купите квартиру с проблемами. Спокойнее?'],
+ ['b_safe','Безопасные расчёты','Деньги продавцу уходят только после регистрации права на вас, через безопасные расчёты. Электронная регистрация — без очередей. Надёжно?'],
+ ['b_msk','Маткапитал и сертификаты','Помогаем правильно использовать маткапитал и сертификаты: документы, сроки, доли детям. Деньги не зависнут, а сделка не сорвётся. Важно?',f=>arr(f.pay).some(x=>x==='Маткапитал'||x.startsWith('Сертификат'))],
+ ['b_sale','Продажа вашей — встречной сделкой','Вашу квартиру продаём параллельно, и всё проводим одной сделкой в один день. Вы не остаётесь без жилья и не теряете выбранный вариант. Удобно?',f=>arr(f.pay).includes('Продажа своей')],
+ ['b_lk','Личный кабинет','Подборки, показы и все этапы — в личном кабинете. Всегда видите, что я делаю. Удобно?'],
+ ['b_gbs','Гарантия безопасности сделки','На сделке компания выдаёт гарантийный сертификат: ответственность пожизненно, до 15 млн ₽. Надёжно?']];
+const NB_UTP=[
+ ['n_free','Новостройки без комиссии','Через наш Единый центр новостроек вы покупаете по цене застройщика, без комиссии. Переплаты нет, а сопровождение есть. Согласитесь, выгодно?'],
+ ['n_all','Все застройщики в одном месте','У нас 1500 квартир от всех застройщиков Кемерово. Я сравню ЖК честно — плюсы и минусы — а не продаю один дом, как отдел продаж застройщика. Удобно?'],
+ ['n_promo','Акции и бронь','Я слежу за акциями застройщиков и бронирую квартиру, пока вы решаете. Не упустите цену и планировку. Важно?'],
+ ['b_mort','Ипотека ниже, чем в банке','Наши брокеры подбирают программу и банк, одобрение по 2 документам, ставка ниже, чем в банке напрямую. Платёж меньше. Выгодно?',f=>f.program!=='Без ипотеки'],
+ ['b_ins','Страховка дешевле на 30–40%','Партнёры всех аккредитованных страховых — страховка дешевле на 30–40%. Выгодно?',f=>f.program!=='Без ипотеки'],
+ ['n_check','Проверка застройщика и договора','Проверяем застройщика, разрешения и ДДУ, объясняем каждый пункт. Вы покупаете спокойно. Согласны?'],
+ ['n_repair','Партнёры по ремонту','Если квартира без отделки — подскажем партнёров по ремонту. Не нужно искать бригаду самому. Удобно?',f=>f.finish!=='С ремонтом'],
+ ['b_gbs','Гарантия безопасности сделки','Компания несёт ответственность по сделке пожизненно, до 15 млн ₽. Надёжно?']];
+const XPRES=[...SELL_UTP.filter(u=>['u_mkt','u_photo','u_audit','u_doc','u_mort'].includes(u[0])),['u_alt2','Встречная сделка в один день','Продажу и покупку проводим одной сделкой в один день. Вы не останетесь без жилья и не будете жить на съёмной. Спокойнее?'],
+ ['x_disc','Скидка на комиссию при обмене','При обмене комиссия за покупку — со скидкой 5%. Один специалист ведёт обе сделки. Выгодно?'],...BUY_UTP.filter(u=>['b_mort','b_ins','b_base','b_check'].includes(u[0])),SELL_UTP.find(u=>u[0]==='u_gbs')];
+
+/* ================= OBJECTIONS ================= */
+const OB_SELL=[
+ ['Я сам продам, зачем мне риелтор','Имя, конечно, можете. Сколько уже висит объявление и сколько было показов? Что не устроило?','Согласен, многие пробуют сами. Вместе с этим собственник один на один уступает больше на торге, а мы ведём переговоры и даём рекламу на 12 площадках. Одна ошибка в документах — и сделка срывается, а за это отвечаем мы. Согласны, что спокойнее, когда это делает специалист?'],
+ ['Комиссия большая','Имя, с чем сравниваете? Только комиссия останавливает?','Согласен, сумма заметная. Вместе с этим в неё входит реклама на платных площадках, фотосессия, юристы, договор, сопровождение и гарантия до 15 млн ₽. А платите только по факту сделки. Профессиональная реклама и торг обычно возвращают больше, чем стоит комиссия. Согласитесь?'],
+ ['Цену снижать не буду','Имя, я и не предлагаю снижать. Что для вас важнее — цена или срок?','Согласен, цену отдавать нельзя. Тестируем вашу цену 3 недели с полной рекламой, каждую неделю показываю отчёт. Если спрос будет — держим. Если нет — решаем вместе по фактам. Справедливо?'],
+ ['Не хочу эксклюзив / договор надолго','Имя, что смущает — срок или обязательства?','Понимаю. Эксклюзив нужен, чтобы я вкладывал в вашу квартиру платную рекламу и фото. Вы ничего не платите до сделки и в любой момент видите мою работу в кабинете. Попробуем?'],
+ ['Сначала найдите покупателя, потом подпишем','Имя, опасаетесь платить за пустую работу?','Понимаю. Без договора я не могу давать рекламу от компании, подключать юристов и давать гарантию. А платите вы всё равно только по факту сделки. Согласны?'],
+ ['Я подумаю / посоветуюсь','Имя, о чём хотите подумать — о цене, условиях или о компании? С кем будете советоваться?','Давайте закроем вопрос сейчас, чтобы вы советовались с полной картиной. Вот ваша дорожная карта: шаги, документы и сумма на руки. Если удобно, встретимся вместе с супругом. Когда?'],
+ ['Уже работаю с другим агентством','Имя, какие результаты уже есть? Сколько показов было? Есть эксклюзив?','Согласен, менять — это решение. Посмотрите, что сделаю я за первую неделю: фотосессия, 12 площадок, отчёт. Решение за вами. Справедливо?']];
+const OB_INH=[['Сначала все наследники должны договориться','Имя, в чём сейчас расхождение — в цене, сроках или в разделе денег?','Понимаю. Давайте я подготовлю для всех один расчёт: цена по рынку, расходы и сумма каждому по долям. С цифрами договориться проще. Соберём всех на созвон?']];
+const OB_BUY=[
+ ['Сам найду на Авито','Имя, сколько уже ищете? Что мешает найти?','Согласен, объявлений много. Вместе с этим часть вариантов есть только в нашей базе, а я отсеиваю проблемные квартиры до показа и торгуюсь за вас. Обычно экономия на торге больше комиссии. Согласны?'],
+ ['Комиссия 2% — дорого','Имя, с чем сравниваете? Только это останавливает?','Согласен, деньги важны. Вместе с этим ипотека через нас дешевле — до 250 тыс. экономии, страховка на 30–40% ниже, юрист проверяет квартиру, а платите только по факту сделки. Согласитесь, это скорее экономия?'],
+ ['Пришлите подборку, договор потом','Имя, что смущает в договоре?','Понимаю. Договор фиксирует, что я работаю на вас и вы платите только по факту сделки. Без него я не могу показывать объекты и подключать юристов и ипотечный отдел. Подписываем и сегодня же отправляю подборку?'],
+ ['Сначала одобрюсь в своём банке','Имя, с каким банком работаете? Что там предлагают?','Отлично, это можно сравнить. Наши брокеры подают сразу в несколько банков по 2 документам и часто получают ставку ниже, чем банк даёт напрямую. Подадим параллельно и выберем лучшее?'],
+ ['Работаю с несколькими агентами','Имя, как вам с ними работается? Сколько показов уже было?','Понимаю. Когда работают несколько агентов, никто не работает на вас до конца. Я берусь за вашу задачу полностью: подборка, показы, торг, ипотека. Давайте попробуем неделю — по результату решите?'],
+ ['Я подумаю','Имя, о чём хотите подумать — о бюджете, районе или о работе с нами?','Давайте разберём это сейчас, чтобы вы думали с полной картиной. Вот ваша карта: шаги, бюджет и платёж. Подписываем — и я сегодня отправлю подборку. Хорошо?']];
+const OB_NB=[
+ ['Куплю напрямую у застройщика — дешевле','Имя, а почему думаете, что у нас дороже?','Через нас цена та же, что у застройщика, без комиссии. Разница в том, что я сравню все ЖК честно, подберу ипотеку дешевле и проверю договор. Получается та же цена плюс сопровождение. Согласны?'],
+ ['Сам съезжу в офис продаж','Имя, в какие ЖК планируете?','Съездите, конечно — и лучше со мной. Менеджер застройщика продаёт свой дом, а я покажу плюсы и минусы каждого рядом. И бронь с ипотекой оформим сразу. Когда удобно поехать?'],
+ ['Подожду, цены упадут','Имя, на что опираетесь?','Понимаю. Вместе с этим новостройки по мере строительства обычно дорожают, а акции действуют ограниченное время. Давайте зафиксируем лучший вариант бронью и посмотрим без спешки. Хорошо?'],
+ ['Боюсь, что не достроят','Имя, есть конкретный ЖК, который смущает?','Это правильный вопрос. Мы проверяем застройщика, разрешения и проектное финансирование. Деньги по ДДУ хранятся на эскроу-счёте в банке и уходят застройщику только после сдачи дома. Спокойнее?'],
+ ['Вторичка надёжнее','Имя, что для вас важнее — заехать сразу или новый дом?','Согласен, у вторички свои плюсы. Давайте сравним на цифрах: я покажу 2–3 варианта и там, и там, с платежом. Решите по фактам. Хорошо?']];
+const OB_REV=[
+ ['Вы просто хотите быстрее продать','Имя, понимаю, почему так кажется. Что именно заставляет так думать?','Мне выгодно продать дороже — от цены зависит и моя работа. Но вот цифры за 3 недели: звонки, показы и что говорили покупатели. Цифры не мои, это рынок. Давайте решать по ним. Согласны?'],
+ ['Давайте подождём ещё','Имя, сколько готовы ждать? Как это влияет на ваш срок?','Можно. Вместе с этим чем дольше объявление висит, тем меньше к нему внимания, и потом приходится снижать сильнее. Предлагаю: усиливаем подачу и ещё 2 недели держим, а в дату Х решаем окончательно. Договорились?'],
+ ['Соседи продали дороже','Имя, а какая у них была квартира — площадь, ремонт, этаж?','Давайте сравним по Росреестру: реальная цена сделки, а не объявления. Если их квартира сопоставима — держим цену и меняем подачу. Если нет — смотрим на реальные аналоги. Справедливо?'],
+ ['Мне не срочно','Имя, а какой срок вас устроит?','Понимаю. Тогда давайте не снижать, а усилить подачу: новые фото, описание, платные статусы. И зафиксируем дату, когда смотрим снова. Хорошо?']];
+
+/* ================= STATE ================= */
+const blank=t=>({id:Date.now(),date:new Date().toISOString().slice(0,10),type:t||'',f:Object.assign({},(TYPES[t]||{}).def||{}),c:{}});
+let S={cur:blank(''),arch:[],tab:'start',photo:'',profile:{},del:{}};
+try{const r=localStorage.getItem('vstrechi2');if(r)S=Object.assign(S,JSON.parse(r));
+ else{const o=localStorage.getItem('vstrechaProdavec');if(o){const p=JSON.parse(o);S.arch=(p.arch||[]).map(m=>Object.assign(m,{type:'so'}));if(p.cur&&Object.keys(p.cur.f||{}).length){p.cur.type='so';S.arch.unshift(p.cur);}S.photo=p.photo||'';}}}catch(e){}
+if(S.photo&&!(S.profile||{}).photo){S.profile=Object.assign({},S.profile,{photo:S.photo});S.photo='';}
+S.profile=S.profile||{};S.del=S.del||{};
+const saveLocal=()=>{try{localStorage.setItem('vstrechi2',JSON.stringify(S));}catch(e){}};
+/* save(true) — данные изменились: отмечаем время и ставим синхронизацию */
+const save=touch=>{if(touch&&S.cur.type)S.cur.updated=Date.now();saveLocal();if(touch)Sync.later();};
+const T=()=>TYPES[S.cur.type], F=()=>S.cur.f, C=()=>S.cur.c;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num=v=>{const x=parseFloat(String(v||'').replace(/\s/g,'').replace(/[^\d.,]/g,'').replace(',','.'));return isNaN(x)?0:x;};
+const rub=n=>Math.round(n).toLocaleString('ru-RU')+' ₽';
+const mln=n=>(n/1e6).toLocaleString('ru-RU',{maximumFractionDigits:2})+' млн';
+const nm=()=>esc((F().name||'').trim()||'Имя');
+const N=()=>'<span class="nm">'+nm()+'</span>';
+const arr=v=>Array.isArray(v)?v:(v?[v]:[]);
+const kind=()=>T()?T().kind:'';
+
+/* ================= LOGIC ================= */
+function isAlt(f){return S.cur.type==='ex'||(f.buyNext&&!['Ничего','Пока не решили'].includes(f.buyNext))||arr(f.why).some(x=>x.startsWith('Обмен'));}
+function sellComm(p){return p<=0?0:p<8e6?Math.max(.028*p,72000):.024*p;}
+function buyComm(p,seg,disc){if(p<=0||seg==='Новостройка')return 0;let c=seg==='Дом'?(p<=2e6?72000:72000+.016*p):Math.max(.02*p,72000);return disc?c*.95:c;}
+function minTerm(f){return (['Наследство','Приватизация','Дарение'].includes(f.basis)||f.onlyHome==='Да')?3:5;}
+function tax(f,p){const y=num(f.years);if(!f.basis||f.years===undefined||f.years==='')return 0;if(y>=minTerm(f))return 0;
+ const base=Math.max(0,p-Math.max(num(f.buyPrice),1e6));return base<=2.4e6?base*.13:2.4e6*.13+(base-2.4e6)*.15;}
+function annuity(L,r,y){if(L<=0||!y)return 0;const i=r/1200,n=y*12;return i?L*i/(1-Math.pow(1+i,-n)):L/n;}
+function sellCalc(){const f=F(),p=num(f.dealPrice)||num(f.expect)||num(f.adprice),k=sellComm(p),m=f.mort==='Да'?num(f.mortLeft):0,
+ no=f.msk==='Да, доли не выделены'?num(f.notary):0,t=tax(f,p),o=num(f.other);return {p,k,m,no,t,o,net:p-k-m-no-t-o};}
+function buyCalc(extraOwn){const f=F(),seg=S.cur.type==='nb'?'Новостройка':(f.seg||'Вторичка'),p=num(f.bprice)||num(f.budget);
+ const k=buyComm(p,seg,S.cur.type==='ex'),own=num(f.own)+(extraOwn||0),msk=num(f.mskSum),cert=num(f.cert);
+ const mortOn=arr(f.pay).includes('Ипотека')||(S.cur.type==='nb'&&f.program&&f.program!=='Без ипотеки');
+ const gp=num(f.gp),ocen=mortOn?(seg==='Дом'?5000:3000):0,ins=mortOn?num(f.ins):0,er=num(f.ereg),sa=num(f.safe);
+ const costs=k+gp+ocen+ins+er+sa;const loan=mortOn?Math.max(0,p-own-msk-cert):0;
+ const pm=annuity(loan,num(f.rate),num(f.term)||20);
+ return {p,seg,k,own,msk,cert,gp,ocen,ins,er,sa,costs,loan,pm,mortOn,gap:mortOn?0:Math.max(0,p+costs-own-msk-cert)};}
+function risks(){const f=F(),r=[],t=S.cur.type,k=kind();if(!k)return r;
+ if(k==='sell'||k==='ex'){const p=num(f.expect)||num(f.adprice),mx=num(f.mktMax),mn=num(f.mktMin);
+  if(p&&mx&&p>mx)r.push('Цена выше рынка на '+Math.round((p/mx-1)*100)+'% — тест 3 недели и отчёт');
+  if(p&&mn&&p<mn)r.push('Цена ниже рынка — можно продать дороже');
+  if(f.msk==='Да, доли не выделены')r.push('Маткапитал: доли не выделены — нотариус до продажи');
+  if(f.msk&&f.msk!=='Нет'||f.minors==='Да')r.push('Дети-собственники: разрешение опеки, детям — доли не меньше в новом жилье');
+  if(f.mort==='Да')r.push('Ипотека'+(f.mortBank?' ('+f.mortBank+')':'')+': справка об остатке, согласование с банком');
+  if(f.spouse==='Да')r.push('Нужно нотариальное согласие супруга');
+  if(num(f.owners)>1)r.push('Собственников '+num(f.owners)+' — все участвуют в сделке');
+  if(f.replan==='Есть, не узаконена')r.push('Неузаконенная перепланировка — проблема для ипотечного покупателя');
+  if(f.debts==='Есть')r.push('Долги ЖКХ — погасить до сделки');
+  if(num(f.reg)>0)r.push('Прописано '+num(f.reg)+' — срок выписки в договоре');
+  const c=sellCalc();if(c.t>0)r.push('Срок владения меньше '+minTerm(f)+' лет — возможен налог ≈ '+rub(c.t));
+  if(t!=='ex'&&isAlt(f))r.push('Клиент ещё и покупатель — предложить встречную сделку');}
+ if(t==='ih'){if(f.inhStatus&&f.inhStatus!=='Свидетельство получено, право зарегистрировано')r.push('Право ещё не зарегистрировано — продать можно только после регистрации');
+  if(f.heirsAgree&&f.heirsAgree!=='Все согласны')r.push('Не все наследники готовы — сначала договорённость');
+  if(f.heirsWhere)r.push('Наследники в другом городе — доверенность или онлайн-подписание');}
+ if(k==='buy'||k==='nb'||k==='ex'){const b=buyCalc(k==='ex'?Math.max(sellCalc().net,0):0);
+  if(b.mortOn&&f.approved!=='Есть одобрение')r.push('Нет одобрения ипотеки — сначала заявка в ипотечный отдел');
+  if(f.approved==='Был отказ')r.push('Был отказ банка — разобрать причину с брокером');
+  if(arr(f.pay).includes('Маткапитал'))r.push('Маткапитал — справка об остатке из Соцфонда, доли детям');
+  if(b.mortOn&&num(f.payWant)&&b.pm>num(f.payWant))r.push('Платёж '+rub(b.pm)+' выше комфортного '+rub(num(f.payWant)));
+  if(arr(f.pay).includes('Продажа своей')&&t!=='ex')r.push('Покупка зависит от продажи — предложить встречную сделку (тип «Обмен»)');}
+ if(arr(f.decide).some(x=>x!=='Только он(а)'))r.push('Решение принимает не один — пригласить '+arr(f.decide).filter(x=>x!=='Только он(а)').join(', ').toLowerCase());
+ if(k==='rev'){const p=num(f.curPrice),mx=num(f.mktMax);if(p&&mx&&p>mx)r.push('Цена выше рынка на '+Math.round((p/mx-1)*100)+'%');
+  if(num(f.rdays)>=14&&!num(f.rshows))r.push('Нет показов за '+num(f.rdays)+' дней — цена или подача не работают');
+  if(num(f.calls)&&!num(f.rshows))r.push('Звонки есть, показов нет — проверить, что отпугивает в разговоре');
+  if(num(f.rshows)>=3)r.push('Показы есть, задатка нет — разобрать обратную связь покупателей');}
+ return r;}
+
+/* ================= FORM RENDER ================= */
+function item(it){const f=F();if(it.show&&!it.show(f))return'';
+ if(it.t==='check'){const c=!!f[it.id];return '<div class="it"><label class="chk'+(c?' done':'')+'"><input type="checkbox" data-k="'+it.id+'"'+(c?' checked':'')+'><span>'+esc(it.q)+'</span></label></div>';}
+ let h='<div class="it"><div class="q">'+esc(it.q)+'</div>'+(it.h?'<div class="h">'+esc(it.h)+'</div>':'');
+ if(it.t==='text')h+='<input type="text" id="f-'+it.id+'" data-k="'+it.id+'" value="'+esc(f[it.id])+'" autocomplete="off">';
+ if(it.t==='num')h+='<input type="text" class="num" inputmode="numeric" id="f-'+it.id+'" data-k="'+it.id+'" value="'+esc(f[it.id])+'" autocomplete="off">';
+ if(it.t==='area')h+='<textarea id="f-'+it.id+'" data-k="'+it.id+'">'+esc(f[it.id])+'</textarea>';
+ if(it.t==='one'||it.t==='many'){const v=arr(f[it.id]);h+='<div class="chips">'+it.o.map(o=>'<button type="button" class="chip'+(v.includes(o)?' on':'')+'" data-ch="'+it.id+'" data-m="'+(it.t==='many'?1:0)+'" data-v="'+esc(o)+'">'+esc(o)+'</button>').join('')+'</div>';}
+ return h+'</div>';}
+const fields=k=>'<div class="box">'+SCH[k].map(item).join('')+'</div>';
+const says=a=>a.map(t=>'<div class="say">'+t+'</div>').join('');
+const head=(t,l)=>'<div><h2>'+t+'</h2>'+(l?'<p class="lead">'+l+'</p>':'')+'</div>';
+const tip=(b,t)=>'<div class="tip"><b>'+b+'</b> '+t+'</div>';
+function chkList(list){return list.map(([id,q,h])=>{const c=!!C()[id];return '<div class="it"><label class="chk'+(c?' done':'')+'"><input type="checkbox" data-c="'+id+'"'+(c?' checked':'')+'><span>'+q+(h?'<small>'+h+'</small>':'')+'</span></label></div>';}).join('');}
+function utpBox(list){const f=F(),l=list.filter(u=>!u[3]||u[3](f)).sort((a,b)=>(b[3]?1:0)-(a[3]?1:0)),d=l.filter(u=>C()[u[0]]).length;
+ return '<div class="box utp"><h3>УТП · озвучено '+d+' из '+l.length+'</h3>'+l.map(([id,t,p,c])=>{const k=!!C()[id];return '<div class="it"><label class="chk'+(k?' done':'')+'"><input type="checkbox" data-c="'+id+'"'+(k?' checked':'')+'><span><b>'+t+(c?' · по ситуации':'')+'</b>'+p+'</span></label></div>';}).join('')+'</div>';}
+function objBox(list){return '<div class="steps-o note" style="font-size:14px">Выслушать → «С чем связано?» → «Только это?» → «Согласен с вами…» → «Вместе с этим…» → «Согласны?»</div>'+
+ list.map(([h,q,a],i)=>'<details class="obj"'+(i<2?' open':'')+'><summary>«'+h+'»</summary><div class="in"><p><em>Уточнить</em>'+q.replace(/Имя/g,N())+'</p><p><em>Ответ</em>'+a+'</p></div></details>').join('');}
+function corridor(cur,curLbl){const f=F(),mn=num(f.mktMin),mx=num(f.mktMax),e=num(cur),a=num(f.adprice);if(!(mn&&mx&&mx>mn))return'';
+ const vals=[mn,mx,e,a].filter(Boolean),lo=Math.min(...vals)*.95,hi=Math.max(...vals)*1.05,pos=v=>((v-lo)/(hi-lo)*100).toFixed(1)+'%';
+ return `<div class="box"><h3>Рыночный коридор</h3><div class="corr"><div class="axis"></div><div class="band" style="left:${pos(mn)};width:calc(${pos(mx)} - ${pos(mn)})"></div>
+  <div class="lb" style="left:${pos(mn)}">${mln(mn)}</div><div class="lb" style="left:${pos(mx)}">${mln(mx)}</div>
+  ${e?`<div class="mk exp" style="left:${pos(e)}">${curLbl} ${mln(e)}<i></i></div>`:''}${a&&a!==e&&S.cur.type!=='rv'?`<div class="mk ad" style="left:${pos(a)}">объявл. ${mln(a)}<i></i></div>`:''}</div>
+  <p class="note" style="margin:6px 0 0">Зелёная полоса — где реально продаются похожие квартиры.</p></div>`;}
+
+/* ================= CALC PANELS ================= */
+function sellCalcHTML(){const f=F(),c=sellCalc();
+ return `<div class="box">${item(nu('dealPrice','Цена для расчёта, ₽','Пусто — берём ожидание клиента или цену из объявления'))}
+  ${f.msk==='Да, доли не выделены'?item(nu('notary','Нотариус: выделение долей, ₽','Уточни у юриста')):''}${item(nu('other','Прочие расходы, ₽','Справки, выписки, нотариус и т.п.'))}</div>
+ <div class="res"><div class="r"><span>Цена продажи</span><b>${rub(c.p)}</b></div><div class="r good"><span>Вам на руки (ориентир)</span><b>${rub(c.net)}</b></div></div>
+ <div class="box"><table class="ledger">
+  <tr><td>Комиссия<small>${c.p<8e6?'2,8%, не менее 72 000 ₽':'2,4%'} · только по факту сделки</small></td><td>${rub(c.k)}</td></tr>
+  ${c.m?`<tr><td>Погашение ипотеки<small>${esc(f.mortBank||'')}</small></td><td>${rub(c.m)}</td></tr>`:''}
+  ${c.no?`<tr><td>Нотариус, доли детей</td><td>${rub(c.no)}</td></tr>`:''}
+  <tr><td>Налог на доход от продажи<small>${c.t?'владение меньше '+minTerm(f)+' лет · предварительно':(f.basis&&f.years?'не платите: срок владения '+num(f.years)+' лет ≥ '+minTerm(f):'укажи основание и срок владения во вкладке «Документы»')}</small></td><td>${rub(c.t)}</td></tr>
+  ${c.o?`<tr><td>Прочие расходы</td><td>${rub(c.o)}</td></tr>`:''}
+  <tr class="total"><td>Вам на руки</td><td>${rub(c.net)}</td></tr></table></div>
+ <p class="note">Налог: 13% с дохода до 2,4 млн и 15% сверху; вычет — 1 млн ₽ или расходы на покупку. Минимальный срок владения 3 года (наследство — с даты открытия, приватизация, дарение от родственника, единственное жильё), иначе 5. Если цена ниже 70% кадастровой стоимости, налог считают от 70% кадастра. Семьи с 2+ детьми при покупке нового жилья могут быть освобождены. Точный расчёт — юрист.</p>`;}
+function buyCalcHTML(extra){const f=F(),b=buyCalc(extra);
+ return `<div class="box">${item(nu('bprice','Цена квартиры для расчёта, ₽','Пусто — берём бюджет'))}${item(nu('gp','Госпошлина за регистрацию, ₽'))}
+  ${b.mortOn?item(nu('ins','Страховка за первый год, ₽','Через наших партнёров дешевле на 30–40%')):''}${item(nu('ereg','Электронная регистрация, ₽'))}${item(nu('safe','Безопасные расчёты, ₽'))}
+  ${b.mortOn?item(nu('rate','Ставка, %','Уточни в ипотечном отделе'))+item(nu('term','Срок, лет')):''}</div>
+ <div class="res"><div class="r"><span>Цена покупки</span><b>${rub(b.p)}</b></div>
+  ${b.mortOn?`<div class="r key"><span>Сумма кредита</span><b>${rub(b.loan)}</b></div><div class="r good"><span>Платёж в месяц${num(f.rate)?'':' (укажи ставку)'}</span><b>${rub(b.pm)}</b></div>`:`<div class="r ${b.gap?'key':'good'}"><span>${b.gap?'Не хватает':'Денег хватает'}</span><b>${rub(b.gap)}</b></div>`}</div>
+ <div class="box"><table class="ledger">
+  <tr><td>Комиссия${b.seg==='Новостройка'?'<small>новостройка — без комиссии</small>':'<small>'+(S.cur.type==='ex'?'2%, со скидкой 5% при обмене':'2%, не менее 72 000 ₽')+' · по факту сделки</small>'}</td><td>${rub(b.k)}</td></tr>
+  ${b.gp?`<tr><td>Госпошлина</td><td>${rub(b.gp)}</td></tr>`:''}${b.ocen?`<tr><td>Оценка для банка</td><td>${rub(b.ocen)}</td></tr>`:''}
+  ${b.ins?`<tr><td>Страховка</td><td>${rub(b.ins)}</td></tr>`:''}${b.er?`<tr><td>Электронная регистрация</td><td>${rub(b.er)}</td></tr>`:''}${b.sa?`<tr><td>Безопасные расчёты</td><td>${rub(b.sa)}</td></tr>`:''}
+  <tr class="total"><td>Расходы по сделке</td><td>${rub(b.costs)}</td></tr></table></div>
+ <p class="note">Расчёт предварительный: ставку, одобренную сумму и расходы подтверждает ипотечный отдел. Расходы по сделке оплачиваются своими деньгами сверх первого взноса — банк их не кредитует.</p>`;}
+
+/* ================= PANELS ================= */
+const P={
+ start:()=>loginCard()+head('Какая встреча?','Выбери тип — вопросы, скрипты, расчёт и карта клиента подстроятся под него.')+
+  '<div class="start">'+Object.entries(TYPES).map(([k,t])=>`<button type="button" class="tcard" data-type="${k}"><i>${t.kind==='sell'||t.kind==='rev'?'Продавец':t.kind==='ex'?'Продажа + покупка':'Покупатель'}</i><b>${t.label}</b><span>${t.when}</span></button>`).join('')+'</div>'+
+  `<div class="box"><h3>Сохранённые встречи</h3>${archHTML()}</div><div class="row"><button class="ibtn" type="button" id="sample">Открыть пример встречи</button></div>`,
+ prep:()=>head('Подготовка к встрече','Заполни до прихода клиента. Цифры коридора — из аналитической справки Космоса.')+fields('prep')+
+  '<div class="box"><h3>Взять с собой</h3>'+chkList([['p1','Агентский договор, 2 экземпляра'],['p2','Аналитическая справка по объекту'],['p3','Согласие на обработку ПДн'],['p4','Визитки'],['p5',S.cur.type==='ss'?'Телефон заряжен для фото, штатив':'Ноутбук открыт на этом пульте']])+'</div>',
+ contact:()=>head('Контакт и повестка','Первые 2 минуты. Клиент должен понять, что уйдёт с готовым планом.')+
+  says([`Здравствуйте, ${N()}! Рад, что пришли. Чай или кофе? Давайте помогу с верхней одеждой.`,
+   `${N()}, предлагаю так: сначала я задам вопросы про вашу ситуацию${S.cur.type==='ex'?', квартиру и что хотите купить':' и квартиру'}, потом покажу, как мы будем действовать, посчитаем${S.cur.type==='ex'?' бюджет на покупку':', сколько вы получите на руки'}, и вы уйдёте с готовой дорожной картой. Около 40 минут. Подходит?`,
+   `Я буду кое-что записывать, чтобы ничего не упустить из того, что для вас важно. Хорошо?`])+
+  tip('Ноутбук:','поверни экран так, чтобы клиент видел, что ты записываешь его слова. Смотри на клиента: галочки и короткие пометки, подробности надиктуешь вечером.'),
+ door:()=>head('Знакомство на объекте','Ты в гостях. Первые минуты — разуться, улыбнуться, найти, за что искренне похвалить квартиру.')+
+  says([`Здравствуйте, ${N()}! Иван, «Этажи». Спасибо, что пригласили. Куда можно разуться?`,
+   `У вас очень светло / уютно / удачная планировка — сразу видно, что квартиру любят.`,
+   `${N()}, предлагаю так: вы покажете мне квартиру — расскажете, что вам в ней нравится, я сделаю пару снимков. Потом сядем на кухне, посчитаем, сколько вы получите на руки, и составим план продажи. Около часа. Удобно?`])+
+  tip('Смол-ток:','соседи, двор, сколько живут здесь. Искренний комплимент, без лести.'),
+ walk:()=>head('Осмотр квартиры','Иди по комнатам вместе с собственником. Его слова о плюсах — лучшие строки для объявления.')+fields('obj')+fields('walk')+
+  '<div class="box"><h3>Фото по стандарту</h3>'+chkList([['ph1','Горизонтально, .jpg 1920×1080, без чужих логотипов'],['ph2','Количество: 1к — 10+, 2к — 15+, 3к — 20+'],['ph3','Каждая комната — 3 ракурса'],['ph4','Подъезд и двор — 5 снимков'],['ph5','Главное фото — гостиная, спальня или кухня'],['ph6','Попросить убрать лишнее со столов и открыть шторы']])+'</div>'+
+  tip('Скажи сразу:','на показах лучше, чтобы вас не было дома — покупатели свободнее смотрят и меньше торгуются.'),
+ sit:()=>head('Ситуация и мотив','Самый важный блок. Мотив и боль клиента — основа всей презентации.')+fields('sit')+tip('Слушай больше, чем говоришь.','После ответа — «А почему это важно для вас?» Повтори боль его словами.'),
+ inh:()=>head('Наследство и доли','Говори спокойно и бережно — для клиента это может быть чувствительная тема.')+fields('inh')+
+  tip('Важно:','продать можно только после регистрации права всех наследников. Если кто-то против — продаётся только доля, и это другая история.'),
+ obj:()=>head('Объект','Плюсы спрашивай словами клиента — они пойдут в объявление.')+fields('obj'),
+ docs:()=>head('Документы и юридическая часть','«Чтобы заранее увидеть все нюансы и сделка не сорвалась, уточню по документам».')+fields('docs'),
+ price:()=>head('Цена','Сначала его ожидание, потом аналитика. Не спорь — показывай факты.')+fields('price')+corridor(F().expect,'хочет')+
+  says([`${N()}, давайте посмотрим на факты: вот по каким ценам реально продаются похожие квартиры. Ваша цена — здесь.`,
+   `Если цена выше рынка, покупатели смотрят вашу квартиру, а покупают соседнюю. Предлагаю: 3 недели тестируем вашу цену с полной рекламой, каждую неделю я показываю отчёт. По фактам решаем вместе. Договорились?`]),
+ pres:()=>head('Презентация','Связывай УТП с тем, что клиент сказал: «Вы говорили, что для вас важно '+esc((arr(F().important)[0]||'…').toLowerCase())+' — поэтому…»')+
+  `<div class="say">${N()}, правильно сделали, что обратились к нам. «Этажи» на рынке 23 года: наш сайт — №1 по посещаемости среди агентств, мы №1 агентство по версии Сбербанка и в ТОП-8 в мире по числу сделок.</div>`+utpBox(SELL_UTP),
+ calc:()=>head('Сколько вы получите на руки','Покажи экран клиенту. Комиссия по тарифам офиса, налог — предварительно.')+sellCalcHTML(),
+ objn:()=>head('Возражения','')+objBox(S.cur.type==='ih'?OB_INH.concat(OB_SELL):OB_SELL),
+ deal:()=>head('Договор и следующие шаги','«'+nm()+', чтобы я начал работать на вашу продажу уже сегодня, подписываем агентский договор».')+
+  says([`Эксклюзивный договор — это полный объём: платная реклама, фотосессия, отчёты и я лично на вашей квартире. Стандартный — минимум услуг. Для вашей задачи рекомендую эксклюзив. Оформляем?`,
+   S.cur.type==='ss'?`Сегодня же зарегистрирую вас в личном кабинете. Фото я сделал, профессиональную съёмку назначим на удобный день — когда?`:`Сегодня же зарегистрирую вас в личном кабинете. Договоримся об осмотре и фотосессии — когда вам удобно?`])+fields('deal'),
+
+ bprep:()=>head('Подготовка к встрече','Что известно до встречи. На дежурстве — заполняй по ходу.')+fields('bprep')+
+  '<div class="box"><h3>Взять с собой</h3>'+chkList([['p1','Агентский договор на покупку, 2 экземпляра'],['p2','Бланки акта осмотра'],['p3','Согласие на обработку ПДн'],['p4','Визитки']])+'</div>',
+ bcontact:()=>head('Контакт и повестка','')+says([`Здравствуйте! Спасибо, что пришли в нашу компанию. Меня зовут Иван, я буду вашим личным специалистом по недвижимости. Как могу к вам обращаться?`,
+   `${N()}, чай или кофе? Давайте помогу с верхней одеждой.`,
+   `Предлагаю так: я задам вопросы, чтобы понять, что вам действительно нужно, потом посчитаем бюджет${S.cur.type==='nb'?' и платёж':' и платёж по ипотеке'}, и вы уйдёте с планом покупки по шагам. Минут 30–40. Хорошо?`]),
+ bneed:()=>head(S.cur.type==='ex'?'Что хотите купить':'Потребности','Не предлагай варианты, пока не понял задачу. Главный вопрос: «Что для вас важно при выборе?»')+fields('bneed')+tip('Копай глубже:','«А почему именно этот район?», «А что будет, если не найдём к этому сроку?»'),
+ nneed:()=>head('Потребности','Спроси, какие ЖК уже смотрел — это экономит время и показывает его критерии.')+fields('nneed'),
+ bmoney:()=>head('Деньги','«Чтобы подобрать варианты, которые вы точно потянете, давайте посчитаем бюджет».')+fields('bmoney')+
+  (S.cur.type==='ex'?tip('Обмен:','деньги от продажи посчитаются сами во вкладке «Расчёт обмена» — здесь укажи только свои накопления сверх них.'):''),
+ bpres:()=>head('Презентация','Начни с того, что важно клиенту, а не с компании.')+
+  `<div class="say">${N()}, правильно сделали, что обратились к нам. «Этажи» на рынке 23 года, мы №1 агентство по версии Сбербанка. Я буду вашим личным специалистом и отстаиваю ваши интересы.</div>`+utpBox(BUY_UTP),
+ npres:()=>head('Презентация','')+`<div class="say">${N()}, правильно сделали, что пришли к нам: у нас все новостройки Кемерово в одном месте и без комиссии.</div>`+utpBox(NB_UTP)+
+  tip('Акции:','перед тем как озвучить скидку или акцию, проверь дэшборд в папке «Отдел Новостроек» — они часто меняются.'),
+ bcalc:()=>head('Бюджет и платёж','Покажи экран клиенту.')+buyCalcHTML(0),
+ bobjn:()=>head('Возражения покупателя','')+objBox(OB_BUY),
+ nobjn:()=>head('Возражения','')+objBox(OB_NB),
+ bdeal:()=>head('Договор и следующие шаги','«'+nm()+', чтобы я начал подбор и мог показывать вам квартиры, подписываем агентский договор».')+
+  says([`Договор фиксирует, что я работаю на вас, а платите вы только по факту сделки. Сегодня же отправлю первую подборку.`,`Акт осмотра подпишем на первом показе — так положено, это защищает и вас, и меня.`,`Предлагаю сразу подать заявку в наш ипотечный отдел — по 2 документам, это ни к чему не обязывает. Паспорт и СНИЛС с собой?`])+fields('bdeal'),
+ ndeal:()=>head('Договор и следующие шаги','')+says([`${N()}, подписываем агентский договор — это бесплатно для вас, комиссии нет. Зато я бронирую, веду ипотеку и проверяю договор.`,`Предлагаю съездить по 2–3 ЖК вместе — когда вам удобно?`])+fields('ndeal'),
+
+ xpres:()=>head('Презентация обмена','Главная выгода — всё в один день и одни руки на обе сделки.')+
+  `<div class="say">${N()}, правильно сделали, что обратились к нам. Обмен — самая сложная сделка: нужно одновременно продать, купить и всё совместить по срокам. Мы делаем это каждый день: 23 года на рынке, №1 агентство по версии Сбербанка.</div>`+utpBox(XPRES),
+ xcalc:()=>{const s=sellCalc(),b=buyCalc(Math.max(s.net,0));
+  return head('Расчёт обмена','Сколько получите от продажи → сколько можете потратить → какой платёж.')+
+  `<div class="res"><div class="r"><span>От продажи на руки</span><b>${rub(s.net)}</b></div><div class="r"><span>Плюс свои / МСК / сертификаты</span><b>${rub(num(F().own)+num(F().mskSum)+num(F().cert))}</b></div>
+   <div class="r good"><span>Без ипотеки можете купить до</span><b>${rub(Math.max(0,s.net+num(F().own)+num(F().mskSum)+num(F().cert)-b.costs))}</b></div></div>
+  <div class="box"><h3>Продажа</h3></div>`+sellCalcHTML()+'<div class="box"><h3>Покупка</h3></div>'+buyCalcHTML(Math.max(s.net,0));},
+
+ rprep:()=>head('Подготовка к встрече о цене','Обнови аналитику и собери цифры из Космоса и площадок до встречи.')+fields('rprep'),
+ rcontact:()=>head('Контакт','Начни с благодарности и с фактов, а не с цены.')+says([`${N()}, здравствуйте! Спасибо, что нашли время. Прошло ${esc(F().rdays||'…')} дней рекламы — я подготовил отчёт, давайте вместе посмотрим, что говорит рынок.`,`Сразу скажу: моя задача — продать вашу квартиру как можно дороже. Поэтому давайте решать по цифрам, а не по ощущениям. Хорошо?`]),
+ rstats:()=>head('Цифры за период','Покажи экран клиенту. Факты сначала, выводы потом.')+fields('rstats')+corridor(F().curPrice,'ваша цена'),
+ rtalk:()=>{const f=F(),v=num(f.views),c=num(f.calls),s=num(f.rshows);let diag='';
+  if(v&&!c)diag='Объявление смотрят, но не звонят — цена или фото не цепляют.';else if(c&&!s)diag='Звонят, но не едут — что-то отпугивает в разговоре или в деталях объявления.';else if(s&&s>=3)diag='Показы есть, задатка нет — покупатели видят что-то, что не стоит этой цены. Смотрим их отзывы.';else if(!v)diag='Мало просмотров — объявление теряется среди конкурентов: цена, статусы, главное фото.';
+  return head('Разговор о цене','Дай клиенту прийти к выводу самому. Вопросы, а не утверждения.')+(diag?tip('Диагноз:',diag):'')+
+  says([`${N()}, посмотрите: ${v||'…'} просмотров, ${c||'…'} звонков, ${s||'…'} показов. Как думаете, о чём говорят эти цифры?`,
+   `Покупатели сравнивают вашу квартиру с ${esc(f.compNew||'другими')} новыми предложениями рядом. Вот что продалось и за сколько.`,
+   `Есть три пути: держим цену и усиливаем подачу, корректируем цену до рынка, или меняем подачу и смотрим ещё 2 недели. Какой вам ближе?`])+fields('rtalk');},
+ robjn:()=>head('Возражения','')+objBox(OB_REV),
+ rdeal:()=>head('Решение и следующие шаги','Зафиксируй решение и дату следующего отчёта.')+says([`${N()}, договорились: ${esc((F().decision||'…').toLowerCase())}. Следующий отчёт пришлю ${esc(F().nextReport||'через неделю')}.`])+fields('rdeal'),
+
+ map:()=>mapHTML(),
+ sum:()=>{const out=exportText();return head('Итог для меня','Скопируй и отправь Claude вечером: разберёт встречу, внесёт в Космос, поставит шаги в календарь и доработает карту для MAX.')+
+  `<div class="box"><h3>Портрет клиента</h3>${portrait()}</div>
+  <div class="box"><h3>Для разбора с Claude</h3><div class="out" id="out">${esc(out)}</div>
+   <div class="row" style="margin-top:8px"><button class="ibtn primary" type="button" id="copyOut">Скопировать</button><span class="note" id="copied" hidden>Скопировано</span></div></div>
+  <div class="box"><h3>Сохранённые встречи</h3>${archHTML()}<div class="row" style="margin-top:8px"><button class="ibtn" type="button" id="saveArch">Сохранить и начать новую</button></div></div>
+  ${Sync.on()?`<p class="note">Встреча сохраняется в твою Google-таблицу «${CFG.sheetTitle}» — Claude может прочитать её сам, копировать не обязательно.</p>`:''}`;},
+ set:()=>setHTML()};
+
+/* ================= CLIENT MAP ================= */
+function sellDocs(){const f=F(),d=[['Паспорта всех собственников','']];
+ const b={'Купля-продажа':'Договор купли-продажи','Наследство':'Свидетельство о праве на наследство','Приватизация':'Договор приватизации','ДДУ':'ДДУ и акт приёма-передачи','Дарение':'Договор дарения','Мена':'Договор мены'}[f.basis];
+ d.push([b||'Документ-основание','']);d.push(['Выписка ЕГРН','закажем сами']);
+ if(f.spouse==='Да')d.push(['Нотариальное согласие супруга','или брачный договор']);
+ if(f.msk&&f.msk!=='Нет'||f.minors==='Да')d.push(['Свидетельства о рождении детей',''],['Разрешение органов опеки','поможем подготовить']);
+ if(f.msk==='Да, доли не выделены')d.push(['Соглашение о выделении долей','у нотариуса']);
+ if(f.mort==='Да')d.push(['Справка об остатке долга','из банка'+(f.mortBank?' '+f.mortBank:'')]);
+ if(f.replan&&f.replan!=='Нет')d.push(['Документы на перепланировку','']);
+ if(S.cur.type==='ih'&&f.heirsWhere)d.push(['Доверенности наследников из других городов','или онлайн-подписание']);
+ d.push(['Справка о зарегистрированных','перед сделкой'],['Справка об отсутствии долгов ЖКХ','перед сделкой']);return d;}
+function buyDocs(){const f=F(),p=arr(f.pay),d=[['Паспорт','всех покупателей'],['СНИЛС','']];
+ const mo=p.includes('Ипотека')||(S.cur.type==='nb'&&f.program&&f.program!=='Без ипотеки');
+ if(mo)d.push(['Для ипотеки — 2 документа','паспорт и второй документ; доход — по требованию банка']);
+ if(arr(f.decide).includes('Супруг(а)')||mo)d.push(['Свидетельство о браке','если в браке']);
+ if(f.kids&&f.kids!=='Нет')d.push(['Свидетельства о рождении детей','']);
+ if(p.includes('Маткапитал'))d.push(['Справка об остатке маткапитала','из Соцфонда']);
+ if(p.some(x=>x.startsWith('Сертификат')))d.push(['Сертификат / документы на субсидию','']);
+ return d;}
+function sellGoal(){const f=F(),w=arr(f.why).filter(x=>x!=='Другое').map(x=>x.toLowerCase());
+ let t='Продать '+(f.rooms?(f.rooms==='Студия'?'студию':f.rooms+'-комнатную квартиру'):'квартиру')+(f.addr?' по адресу '+f.addr:'');
+ const imp=arr(f.important).map(x=>x.toLowerCase());if(imp.length)t+=' — важно: '+imp.join(', ');if(f.deadline)t+='. Срок: '+f.deadline;if(w.length)t+='. Причина: '+w.join(', ');
+ if(isAlt(f)&&S.cur.type!=='ex')t+='. Взамен — '+(f.buyNext||'новое жильё').toLowerCase()+', встречной сделкой';return t+'.';}
+function buyGoal(){const f=F(),r=arr(f.brooms);let t='Купить '+(S.cur.type==='nb'?'квартиру в новостройке':(f.seg==='Дом'?'дом':'квартиру'))+(r.length?' — '+r.join(' или ')+(r.every(x=>x==='Студия')?'':' комн.'):'')+(f.district?', район: '+f.district:'');
+ const imp=arr(f.bimp).map(x=>x.toLowerCase());if(imp.length)t+='. Важно: '+imp.join(', ');if(num(f.budget))t+='. Бюджет до '+rub(num(f.budget));if(f.bdeadline)t+='. Срок: '+f.bdeadline;return t+'.';}
+function sellSteps(){const f=F(),s=[['Сегодня','Договор и план продажи','Агентский договор, личный кабинет, ваша дорожная карта']];
+ if(S.cur.type==='ih'&&f.inhStatus&&f.inhStatus!=='Свидетельство получено, право зарегистрировано')s.push(['Сначала','Оформление наследства','Свидетельство у нотариуса и регистрация права всех наследников — помогаем с документами']);
+ s.push([S.cur.type==='ss'?'В течение 3 дней':(f.viewDate||'1–3 дня'),S.cur.type==='ss'?'Профессиональная фотосессия':'Осмотр и фотосессия','Профессиональные фото, продающее описание, аудит документов юристом']);
+ s.push(['Старт продажи','Реклама','12 площадок, платные статусы, риелторские чаты, соцсети, баннер, расклейка']);
+ if(f.msk&&f.msk!=='Нет'||f.minors==='Да')s.push(['Параллельно','Опека и доли','Разрешение органов опеки'+(f.msk==='Да, доли не выделены'?' и выделение долей у нотариуса':'')]);
+ if(isAlt(f)&&S.cur.type!=='ex')s.push(['Параллельно','Подбор нового жилья','Подборка, просмотры, одобрение ипотеки при необходимости']);
+ s.push(['Каждую неделю','Отчёт','Просмотры, звонки, показы, конкуренты — в личном кабинете'],['Через 3 недели','Анализ спроса','Смотрим на цифры и при необходимости корректируем стратегию'],
+  ['Покупатель найден','Задаток','Проверяем покупателя и его деньги, подписываем соглашение о задатке'],
+  ['Сделка','Договор и расчёты',(f.mort==='Да'?'Погашение ипотеки и снятие обременения, ':'')+'безопасные расчёты, регистрация'],['Финал','Деньги у вас','Гарантийный сертификат безопасности компании']);return s;}
+function buySteps(){const f=F(),mo=arr(f.pay).includes('Ипотека'),s=[['Сегодня','Договор и план покупки','Агентский договор, личный кабинет'+(mo?', заявка в ипотечный отдел':'')]];
+ if(mo&&f.approved!=='Есть одобрение')s.push(['1–3 дня','Одобрение ипотеки','Наши брокеры подают в несколько банков по 2 документам']);
+ s.push([f.podb||'Сегодня–завтра','Подборка','Варианты под вашу задачу из базы компании и рынка'],[f.shows||'На неделе','Показы','Смотрим вместе, подписываем акт осмотра, я веду переговоры'],
+  ['Выбрали квартиру','Проверка и задаток','Юрист проверяет квартиру, подписываем соглашение о задатке']);
+ if(mo)s.push(['После задатка','Банк одобряет квартиру','Оценка, страховка через партнёров — дешевле на 30–40%']);
+ s.push(['Сделка','Договор и расчёты','Безопасные расчёты, электронная регистрация'],['Финал','Ключи у вас','Гарантийный сертификат безопасности компании']);return s;}
+function nbSteps(){const f=F(),mo=f.program!=='Без ипотеки',s=[['Сегодня','Договор и план','Агентский договор — для вас без комиссии'+(mo?', заявка в ипотечный отдел':'')]];
+ s.push([f.jk?'1–2 дня':'1–2 дня','Подборка ЖК','Сравнение ЖК и планировок под вашу задачу, актуальные акции']);
+ s.push([f.trip||'На неделе','Поездка по ЖК','Офисы продаж, шоурумы, сами дома — вместе со мной']);
+ if(mo)s.push(['Параллельно','Одобрение ипотеки','Подбор программы и банка, ставка ниже, чем напрямую']);
+ s.push(['Выбрали','Бронь','Фиксируем квартиру и цену'],['Сделка','ДДУ или договор купли-продажи','Проверяем договор, деньги — на эскроу-счёт, электронная регистрация']);
+ if(f.ready&&f.ready!=='Дом сдан')s.push(['Сдача дома','Приёмка квартиры','Проверяем квартиру перед подписанием акта']);
+ s.push(['Финал','Ключи у вас','Партнёры по ремонту — если нужно']);return s;}
+function exSteps(){const f=F();return [['Сегодня','Договор и план обмена','Агентский договор, личный кабинет, заявка в ипотечный отдел'],
+ ['1–3 дня','Фото и реклама вашей квартиры','Фотосессия, описание, аудит документов, 12 площадок'],
+ ['Параллельно','Одобрение и подборка','Одобрение ипотеки под обмен, подборка нового жилья, показы'],
+ ...((f.msk&&f.msk!=='Нет'||f.minors==='Да')?[['Параллельно','Опека и доли','Разрешение опеки: дети получают доли в новом жилье']]:[]),
+ ['Покупатель найден','Два задатка','Задаток от покупателя вашей и задаток за новую — согласованные сроки'],
+ ['Сделка','Встречная сделка в один день','Продажа и покупка одной цепочкой, безопасные расчёты, регистрация'],['Финал','Переезд','Гарантийный сертификат безопасности компании']];}
+function revSteps(){const f=F(),ch=arr(f.changes),s=[];
+ if(f.decision==='Снижаем цену')s.push(['Сегодня','Новая цена '+(num(f.newPrice)?rub(num(f.newPrice)):''),'Обновляем объявления на всех площадках']);
+ if(f.decision==='Держим цену')s.push(['Сегодня','Держим цену '+(num(f.curPrice)?rub(num(f.curPrice)):''),'Усиливаем подачу']);
+ ch.forEach(c=>s.push(['На этой неделе',c,'']));
+ s.push([f.nextReport||'Через неделю','Следующий отчёт','Звонки, показы и обратная связь — сравним с этим периодом']);return s;}
+
+function mapHTML(){const f=F(),t=S.cur.type,k=kind(),fr=f.name?esc(f.name.trim()):'';
+ if(!t)return head('Карта клиента','Сначала выбери тип встречи.');
+ const ava='<img src="'+(ME().photo||MEPHOTO)+'" alt="'+esc(ME().name)+'">';
+ let title='Ваш план',goal='',steps=[],docs=[],money=[],extra='',iDo=[],youDo=[];
+ if(k==='sell'){title='план продажи';goal=sellGoal();steps=sellSteps();docs=sellDocs();const c=sellCalc();
+  if(c.p)money=[['Цена продажи',c.p],['Комиссия — по факту сделки',c.k],c.m&&['Погашение ипотеки',c.m],c.t&&['Налог, предварительно',c.t],['Вам на руки, ориентир',c.net,1]];
+  iDo=['Фотосессия и продающее описание','Реклама на 12 площадках','Звонки, показы и переговоры','Еженедельный отчёт','Проверка покупателя','Договор и сопровождение сделки'];
+  youDo=['Подготовить документы из списка','Держать квартиру готовой к показам','Сообщать мне об изменениях планов'];if(f.mort==='Да')youDo.unshift('Заказать в банке справку об остатке долга');}
+ if(k==='buy'||k==='nb'){title=k==='nb'?'план покупки новостройки':'план покупки';goal=buyGoal();steps=k==='nb'?nbSteps():buySteps();docs=buyDocs();const b=buyCalc(0);
+  if(b.p)money=[['Цена квартиры',b.p],b.own&&['Ваш первый взнос',b.own],b.msk&&['Маткапитал',b.msk],['Расходы по сделке, своими',b.costs],b.mortOn&&['Сумма кредита',b.loan],b.mortOn&&num(f.rate)?['Платёж в месяц, ориентир',b.pm,1]:(!b.mortOn&&['Нужно всего',b.p+b.costs,1])];
+  iDo=k==='nb'?['Сравнение ЖК и планировок','Проверка акций и бронь','Подбор ипотеки','Проверка застройщика и договора','Сопровождение до ключей']:['Подборка под вашу задачу','Организация показов','Переговоры и торг','Проверка квартиры юристом','Ипотека через наших брокеров','Сопровождение сделки'];
+  youDo=['Подготовить документы из списка','Давать обратную связь по вариантам','Сообщать мне об изменениях планов'];}
+ if(k==='ex'){title='план обмена';const s=sellCalc(),b=buyCalc(Math.max(s.net,0));goal=sellGoal().replace(/\.$/,'')+'. '+buyGoal();steps=exSteps();
+  docs=sellDocs().concat(buyDocs().filter(d=>!d[0].startsWith('Паспорт')));
+  money=[s.p&&['Продажа вашей',s.p],s.p&&['Вам на руки от продажи',s.net],b.p&&['Покупка новой',b.p],b.mortOn&&b.p&&['Сумма кредита',b.loan],b.mortOn&&num(f.rate)&&['Платёж в месяц, ориентир',b.pm,1]];
+  iDo=['Продажа вашей квартиры: фото, реклама, показы','Подбор нового жилья','Ипотека через наших брокеров','Согласование сроков обеих сделок','Встречная сделка в один день'];
+  youDo=['Подготовить документы из списка','Держать квартиру готовой к показам','Давать обратную связь по вариантам'];}
+ if(k==='rev'){title='отчёт о продаже';const v=num(f.views),c=num(f.calls),s=num(f.rshows);
+  goal='Продать квартиру'+(f.addr?' по адресу '+f.addr:'')+'. В рекламе '+(f.rdays||'…')+' дней'+(num(f.curPrice)?', текущая цена '+rub(num(f.curPrice)):'')+'. Решение: '+(f.decision||'…').toLowerCase()+(f.decision==='Снижаем цену'&&num(f.newPrice)?' до '+rub(num(f.newPrice)):'')+'.';
+  extra=`<div class="sh-sec"><h4>Цифры за период</h4><div class="stats"><div><b>${f.rdays||'—'}</b><span>дней</span></div><div><b>${v||'—'}</b><span>просмотров</span></div><div><b>${c||'—'}</b><span>звонков</span></div><div><b>${s||'—'}</b><span>показов</span></div></div></div>`+
+   (num(f.mktMin)?`<div class="sh-sec"><h4>Рынок</h4><div class="goal">Похожие квартиры реально продаются за ${rub(num(f.mktMin))} – ${rub(num(f.mktMax))}.${num(f.compNew)?' Новых конкурентов за период: '+num(f.compNew)+'.':''}${f.compSold?' Продано рядом: '+esc(f.compSold)+'.':''}</div></div>`:'')+
+   (f.feedback?`<div class="sh-sec"><h4>Что говорят покупатели</h4><div class="goal">${esc(f.feedback)}</div></div>`:'');
+  steps=revSteps();}
+ const money2=money.filter(Boolean);
+ return `<div class="row noprint" style="justify-content:space-between"><div><h2>Карта клиента</h2><p class="lead">Поверни экран к клиенту. ${self===top?'Печать — одна страница A4.':'Для печати открой файл на ноутбуке в браузере и нажми Ctrl+P.'}</p></div>${self===top?'<button class="ibtn primary" type="button" id="printMap">Печать</button>':''}</div>
+ <div class="sheet"><div class="sh-head"><div class="ava">${ava}</div><div class="t"><div class="k">Дорожная карта</div><h1>${fr?fr+', ваш '+title:'Ваш '+title}</h1><div class="s">${esc(f.addr||'')}${f.addr?' · ':''}${new Date(S.cur.date).toLocaleDateString('ru-RU')}</div></div><img class="logo" src="${LOGO}" alt="Этажи"></div>
+  <div class="sh-body">
+   <div class="sh-sec"><h4>${k==='rev'?'Где мы сейчас':'Ваша задача'}</h4><div class="goal">${esc(goal)}</div></div>${extra}
+   <div class="sh-sec"><h4>${k==='rev'?'Что делаем дальше':'Шаги'}</h4><ol class="steps">${steps.map(([w,t,d])=>`<li><div class="when">${esc(w)}</div><div class="what"><b>${esc(t)}</b><span>${esc(d)}</span></div></li>`).join('')}</ol></div>
+   ${docs.length?`<div class="sh-sec"><h4>Документы</h4><ul class="docs">${docs.map(([t,s])=>`<li>${esc(t)}${s?' <small>· '+esc(s)+'</small>':''}</li>`).join('')}</ul></div>`:''}
+   ${money2.length?`<div class="sh-sec"><h4>Деньги</h4><div class="money">${money2.map(m=>`<div${m[2]?' class="hl"':''}><span>${m[0]}</span><b>${rub(m[1])}</b></div>`).join('')}</div></div>`:''}
+   ${iDo.length?`<div class="sh-sec full-only"><h4>Кто что делает</h4><div class="duo"><div><b>Я</b><ul>${iDo.map(x=>'<li>'+x+'</li>').join('')}</ul></div><div><b>Вы</b><ul>${youDo.map(x=>'<li>'+x+'</li>').join('')}</ul></div></div></div>`:''}
+   <div class="guar"><b>Гарантия безопасности.</b> На сделке «Этажи» выдают гарантийный сертификат: компания несёт финансовую и юридическую ответственность пожизненно, до 15 млн ₽. Юристы проверяют документы, ипотечный отдел подбирает ставку ниже, чем в банке напрямую.</div>
+  </div>
+  <div class="sh-foot"><b>${ME().name}</b><span>${ME().phone}</span><span>Telegram ${ME().tg}</span><span>${ME().site}</span><small>${ME().role} · офис: ${ME().office}. Расчёты предварительные и уточняются после проверки документов и одобрения банка.</small></div></div>`;}
+
+/* ================= SUMMARY ================= */
+function exportText(){const f=F(),t=T();if(!t)return'';const L=['Встреча: '+t.label+', '+new Date(S.cur.date).toLocaleDateString('ru-RU')];
+ t.tabs.forEach(p=>{const sch=SCH[p]||(p==='walk'?[]:null);const list=(p==='walk'?SCH.obj.concat(SCH.walk):SCH[p]);if(!list)return;
+  const rows=list.filter(it=>{const v=f[it.id];return v!==undefined&&v!==''&&!(Array.isArray(v)&&!v.length)&&v!==false;}).map(it=>{let v=f[it.id];if(Array.isArray(v))v=v.join(', ');if(v===true)v='да';if(it.t==='num'&&num(v)>=10000)v=rub(num(v));return it.q.replace(/\?$/,'')+': '+v;});
+  if(rows.length){L.push('— '+TL[p]);rows.forEach(r=>L.push(r));}});
+ const k=t.kind;
+ if(k==='sell'||k==='ex'){const c=sellCalc();if(c.p)L.push('Расчёт продажи: цена '+rub(c.p)+', комиссия '+rub(c.k)+(c.t?', налог ≈'+rub(c.t):'')+', на руки '+rub(c.net));}
+ if(k==='buy'||k==='nb'||k==='ex'){const b=buyCalc(k==='ex'?Math.max(sellCalc().net,0):0);if(b.p)L.push('Расчёт покупки: цена '+rub(b.p)+', расходы '+rub(b.costs)+(b.mortOn?', кредит '+rub(b.loan)+(num(f.rate)?', платёж '+rub(b.pm):''):''));}
+ const ut=Object.keys(C()).filter(x=>C()[x]&&/^(u_|b_|n_|x_)/.test(x));if(ut.length)L.push('Озвучено УТП: '+ut.length);
+ const r=risks();if(r.length){L.push('— Риски');r.forEach(x=>L.push('• '+x));}
+ return L.join('\n');}
+function portrait(){const f=F(),r=risks();const row=(k,v)=>v?'<div class="it"><div class="h" style="margin:0">'+k+'</div><div>'+esc(v)+'</div></div>':'';
+ return row('Клиент',[f.name,f.phone].filter(Boolean).join(' · '))+row('Тип встречи',T()?T().label:'')+
+  row('Мотив',[arr(f.why).concat(arr(f.bwhy)).join(', '),f.whyTxt].filter(Boolean).join(' — '))+row('Боль',f.pain)+row('Срок',f.deadline||f.bdeadline)+
+  row('Что важно',arr(f.important).concat(arr(f.bimp)).join(', '))+row('Чего боится',f.fear)+row('Решение принимают',arr(f.decide).join(', '))+
+  row('Деньги',arr(f.pay).join(', ')+(num(f.budget)?' · бюджет '+rub(num(f.budget)):''))+row('Температура',f.temp)+row('Договор',f.contract)+row('Следующий контакт',f.nextContact)+
+  '<div class="it"><div class="h" style="margin:0">Риски</div><div class="risks">'+(r.length?r.map(x=>'<div class="risk">'+esc(x)+'</div>').join(''):'<div class="risk ok">Явных рисков пока не видно</div>')+'</div></div>';}
+function archHTML(){if(!S.arch.length)return '<p class="empty">Пока пусто. Встреча сохраняется сюда, когда начинаешь новую.</p>';
+ return '<div class="arch">'+S.arch.map((m,i)=>'<div><span>'+new Date(m.date).toLocaleDateString('ru-RU')+' · '+esc((TYPES[m.type]||{}).label||'')+' · '+esc(m.f.name||'Без имени')+'</span><span class="row"><button class="ibtn" type="button" data-open="'+i+'">Открыть</button><button class="ibtn" type="button" data-del="'+i+'">Удалить</button></span></div>').join('')+'</div>';}
+function rail(){const f=F(),k=kind();if(!k)return'';const r=risks();let money='';
+ if(k==='sell'){const c=sellCalc();if(c.p)money=`<div class="box"><h3>На руки</h3><div style="font-family:var(--display);font-size:20px">${rub(c.net)}</div><div class="note">цена ${rub(c.p)}, комиссия ${rub(c.k)}</div></div>`;}
+ if(k==='buy'||k==='nb'||k==='ex'){const b=buyCalc(k==='ex'?Math.max(sellCalc().net,0):0);if(b.p)money=`<div class="box"><h3>${b.mortOn?'Кредит и платёж':'Покупка'}</h3><div style="font-family:var(--display);font-size:20px">${b.mortOn?rub(b.pm)+'/мес':rub(b.p)}</div><div class="note">${b.mortOn?'кредит '+rub(b.loan):'расходы '+rub(b.costs)}</div></div>`;}
+ const why=arr(f.why).concat(arr(f.bwhy)),imp=arr(f.important).concat(arr(f.bimp));
+ return `<div class="box"><h3>Клиент</h3><div style="font-weight:700">${esc(f.name||'—')}</div><div class="note">${esc(T().label)}${f.addr?' · '+esc(f.addr):''}</div>
+  ${why.length?'<div style="margin-top:6px;font-size:14px"><b>Мотив:</b> '+esc(why.join(', '))+'</div>':''}${f.pain?'<div style="margin-top:4px;font-size:14px"><b>Боль:</b> '+esc(f.pain)+'</div>':''}
+  ${imp.length?'<div style="margin-top:4px;font-size:14px"><b>Важно:</b> '+esc(imp.join(', '))+'</div>':''}</div>${money}
+  <div class="box"><h3>Риски · ${r.length}</h3><div class="risks">${r.length?r.map(x=>'<div class="risk">'+esc(x)+'</div>').join(''):'<div class="risk ok">Пока чисто</div>'}</div></div>`;}
+
+
+/* =====================================================================
+   ХРАНИЛИЩЕ. Интерфейс одинаковый для любого бэкенда:
+     readAll() -> {meetings:[...], profile}
+     writeAll(meetings, profile)
+     signIn(), signOut(), who()
+   Сейчас: GoogleStore (вход через Google, данные в Google Таблице пользователя).
+   Дальше: ApiStore — свой сервер с логином и паролем для продажи пульта
+   (те же методы поверх /api/meetings), UI и данные встречи не меняются.
+   ===================================================================== */
+const CFG={backend:'google',clientId:'__CLIENT_ID__',scopes:'https://www.googleapis.com/auth/drive.file openid email',sheetTitle:'Пульт встреч — данные',schema:1};
+const CLOUD_OK=location.protocol==='https:'&&self===top&&!/claude\.ai|claudeusercontent/.test(location.hostname);
+const G={get:(k,d)=>{try{const v=localStorage.getItem('vs_g_'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set:(k,v)=>{try{localStorage.setItem('vs_g_'+k,JSON.stringify(v));}catch(e){}}};
+const cid=()=>(CFG.clientId&&!CFG.clientId.startsWith('__')?CFG.clientId:G.get('cid',''));
+const baseUrl=()=>location.origin+location.pathname.replace(/index\.html$/,'');
+function token(){const t=G.get('tok',null);return t&&t.exp>Date.now()+60000?t.t:null;}
+const COLS=['id','Обновлено','Удалено','Дата','Тип','Клиент','Телефон','Адрес','Температура','Следующий контакт','Договор','Итог встречи (текст)','data (не редактировать)'];
+const GoogleStore={
+ async api(url,opt){opt=opt||{};const t=token();if(!t)throw{code:401};
+  const r=await fetch(url,Object.assign({},opt,{headers:Object.assign({'Authorization':'Bearer '+t,'Content-Type':'application/json'},opt.headers||{})}));
+  if(r.status===401){G.set('tok',null);throw{code:401};}if(!r.ok){let m='';try{m=(await r.json()).error.message;}catch(x){}throw{code:r.status,msg:m};}return r.status===204?null:r.json();},
+ async sheetId(){let id=G.get('sid','');if(id)return id;
+  const q=encodeURIComponent("name='"+CFG.sheetTitle+"' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
+  const r=await this.api('https://www.googleapis.com/drive/v3/files?spaces=drive&fields=files(id)&q='+q);
+  if(r.files&&r.files.length)id=r.files[0].id;
+  else{const c=await this.api('https://sheets.googleapis.com/v4/spreadsheets',{method:'POST',body:JSON.stringify({properties:{title:CFG.sheetTitle,locale:'ru_RU'},sheets:[{properties:{title:'Встречи',gridProperties:{frozenRowCount:1}}},{properties:{title:'Профиль'}}]})});id=c.spreadsheetId;}
+  G.set('sid',id);return id;},
+ async readAll(){const id=await this.sheetId(),u=r=>'https://sheets.googleapis.com/v4/spreadsheets/'+id+'/values/'+encodeURIComponent(r);
+  let rows=[],prof=null;
+  try{rows=((await this.api(u('Встречи!A2:M'))).values)||[];}catch(e){if(e.code===404||e.code===400){G.set('sid','');throw{code:'gone',msg:'Таблица не найдена — создам новую при следующей синхронизации'};}throw e;}
+  try{const p=(await this.api(u('Профиль!A1'))).values;if(p&&p[0]&&p[0][0])prof=JSON.parse(p[0][0]);}catch(e){}
+  const meetings=rows.map(r=>{try{const m=JSON.parse(r[12]||'{}');m.id=m.id||+r[0];if(r[2]==='1')m.deleted=true;m.updated=+r[1]||m.updated||0;return m;}catch(e){return null;}}).filter(m=>m&&m.id);
+  return {meetings,profile:prof};},
+ async writeAll(meetings,profile){const id=await this.sheetId(),u=r=>'https://sheets.googleapis.com/v4/spreadsheets/'+id+'/values/'+encodeURIComponent(r)+'?valueInputOption=RAW';
+  const rows=[COLS].concat(meetings.map(m=>m.deleted?[String(m.id),String(m.updated||0),'1','','','','','','','','','','{"id":'+m.id+'}']:
+   [String(m.id),String(m.updated||0),'',m.date||'',(TYPES[m.type]||{}).label||'',m.f.name||'',m.f.phone||'',m.f.addr||'',m.f.temp||'',m.f.nextContact||'',m.f.contract||'',textOf(m),JSON.stringify(m)]));
+  await this.api(u('Встречи!A1:M'+rows.length),{method:'PUT',body:JSON.stringify({values:rows})});
+  const p=Object.assign({},profile);await this.api(u('Профиль!A1:B1'),{method:'PUT',body:JSON.stringify({values:[[JSON.stringify(p),'профиль агента — не редактировать']]})});},
+ async who(){try{const r=await this.api('https://www.googleapis.com/oauth2/v3/userinfo');return r.email||'';}catch(e){return '';}}};
+const Store={google:GoogleStore}[CFG.backend];
+function textOf(m){const keep=S.cur;S.cur=m;let t='';try{t=exportText();}catch(e){}S.cur=keep;return t;}
+
+const Sync={state:'off',busy:false,timer:null,err:'',
+ on:()=>CLOUD_OK&&!!G.get('on',false)&&!!cid(),
+ signIn(prompt){if(!cid()){go('set');return;}const st=Math.random().toString(36).slice(2);G.set('state',st);G.set('try',Date.now());saveLocal();
+  const q=new URLSearchParams({client_id:cid(),redirect_uri:baseUrl(),response_type:'token',scope:CFG.scopes,include_granted_scopes:'true',state:st});
+  if(prompt)q.set('prompt',prompt);const h=G.get('email','');if(h)q.set('login_hint',h);location.href='https://accounts.google.com/o/oauth2/v2/auth?'+q;},
+ async signOut(wipe){const t=token();G.set('tok',null);G.set('on',false);G.set('sid','');G.set('email','');
+  if(t)try{await fetch('https://oauth2.googleapis.com/revoke?token='+t,{method:'POST'});}catch(e){}
+  if(wipe){try{localStorage.removeItem('vstrechi2');}catch(e){}S={cur:blank(''),arch:[],tab:'start',photo:'',profile:{},del:{}};saveLocal();}
+  this.state='off';this.pill();go('start');},
+ later(){if(!this.on())return;this.state='dirty';this.pill();clearTimeout(this.timer);this.timer=setTimeout(()=>this.run(),2500);},
+ boot(){if(!CLOUD_OK)return;
+  if(/access_token=|error=/.test(location.hash)){const p=new URLSearchParams(location.hash.slice(1));history.replaceState(null,'',location.pathname+location.search);
+   if(p.get('state')===G.get('state','')){if(p.get('access_token')){G.set('tok',{t:p.get('access_token'),exp:Date.now()+(+p.get('expires_in')||3600)*1000});G.set('on',true);G.set('needTap',false);
+     GoogleStore.who().then(e=>{if(e){G.set('email',e);this.pill();}});}
+    else G.set('needTap',true);}}
+  if(this.on()){if(token())setTimeout(()=>this.run(),300);else if(!G.get('needTap',false)&&Date.now()-G.get('try',0)>10*60000)this.signIn('none');else{this.state='login';}}
+  this.pill();
+  window.addEventListener('focus',()=>{if(this.on()&&token()&&Date.now()-(G.get('last',0))>60000)this.run();});},
+ async run(manual){if(!this.on()||this.busy)return;if(!token()){this.state='login';this.pill();return;}
+  this.busy=true;this.state='sync';this.pill();
+  try{const R=await Store.readAll(),map={};
+   const local=[S.cur].concat(S.arch).filter(m=>m&&m.type);
+   local.forEach(m=>{map[m.id]=m;});
+   Object.entries(S.del).forEach(([id,ts])=>{map[id]={id:+id,deleted:true,updated:ts};});
+   let curChanged=false;
+   R.meetings.forEach(r=>{const l=map[r.id];if(!l||(r.updated||0)>(l.updated||0)){map[r.id]=r;if(S.cur.id===r.id)curChanged=true;}});
+   const all=Object.values(map);
+   const live=all.filter(m=>!m.deleted);
+   if(curChanged){const n=map[S.cur.id];if(n&&!n.deleted)S.cur=n;else S.cur=blank('');}
+   if(map[S.cur.id]&&map[S.cur.id].deleted)S.cur=blank('');
+   S.arch=live.filter(m=>m.id!==S.cur.id).sort((a,b)=>(b.updated||0)-(a.updated||0));
+   Object.keys(S.del).forEach(id=>{if(!map[id]||map[id].deleted)delete S.del[id];});
+   if(R.profile&&(R.profile.updated||0)>(S.profile.updated||0))S.profile=R.profile;
+   await Store.writeAll(all.sort((a,b)=>a.id-b.id),S.profile);
+   G.set('last',Date.now());this.state='ok';this.err='';saveLocal();
+   if(curChanged||manual||['start','set','sum'].includes(S.tab))go(S.tab,true);
+  }catch(e){this.state=e.code===401?'login':'err';this.err=e.msg||(e.code?'код '+e.code:String(e));
+   if(e.code===403)this.err+=' — проверь, что в Google Cloud включён Google Sheets API';}
+  this.busy=false;this.pill();},
+ pill(){const b=$('#cloud');if(!b)return;if(!CLOUD_OK||!G.get('on',false)){b.hidden=true;return;}b.hidden=false;
+  const m={ok:['✓ Сохранено','ok'],dirty:['Сохраняю…',''],sync:['Синхронизация…',''],login:['Войти в Google','warn'],err:['Ошибка — повторить','warn'],off:['Облако','']}[this.state]||['Облако',''];
+  b.textContent=m[0];b.className='ibtn cloud '+m[1];b.title=this.err||'';}};
+
+function loginCard(){if(!CLOUD_OK||G.get('on',false))return '';
+ return `<div class="box" style="border-color:var(--accent)"><h3>Вход</h3><p style="margin:0 0 10px">Войди через рабочий Google — встречи будут на телефоне и на любом компьютере, а данные лягут в твою Google-таблицу.</p>
+  <div class="row"><button class="ibtn primary" type="button" id="loginBtn">Войти через Google</button><span class="note">Без входа данные хранятся только в этом браузере.</span></div></div>`;}
+function setHTML(){const p=ME(),sid=G.get('sid','');
+ const cloud=!CLOUD_OK?`<p class="note">Здесь пульт открыт внутри Claude — облако недоступно, данные хранятся в этом браузере. Для входа через Google открой пульт с твоего сайта.</p>`:
+  `<div class="it"><div class="q">Статус</div><div>${G.get('on',false)?(token()?'Вход выполнен'+(G.get('email','')?': <b>'+esc(G.get('email',''))+'</b>':''):'Нужно войти снова'):'Не подключено'}${Sync.err?'<div class="note" style="color:var(--accent)">'+esc(Sync.err)+'</div>':''}</div></div>
+   ${CFG.clientId&&!CFG.clientId.startsWith('__')?'':`<div class="it"><div class="q">Client ID из Google Cloud</div><div class="h">Проект «pult» → Credentials → OAuth client</div><input type="text" id="cidIn" value="${esc(G.get('cid',''))}" placeholder="…apps.googleusercontent.com" autocomplete="off"></div>`}
+   <div class="it"><div class="q">Адрес для Google Cloud</div><div class="h">Добавь в Authorized redirect URIs</div><div><b>${esc(baseUrl())}</b></div></div>
+   <div class="row" style="margin-top:8px">${G.get('on',false)&&token()?'<button class="ibtn primary" type="button" id="syncNow">Синхронизировать</button>':'<button class="ibtn primary" type="button" id="loginBtn">Войти через Google</button>'}
+    ${sid?`<a class="ibtn" href="https://docs.google.com/spreadsheets/d/${sid}" target="_blank" rel="noopener">Открыть таблицу</a>`:''}
+    ${G.get('on',false)?'<button class="ibtn" type="button" id="outBtn">Выйти</button><button class="ibtn" type="button" id="wipeBtn">Выйти и стереть с этого устройства</button>':''}</div>
+   <p class="note">На чужом компьютере после работы нажми «Выйти и стереть с этого устройства» — встречи останутся в твоей таблице.</p>`;
+ const fld=(k,l)=>`<div class="it"><div class="q">${l}</div><input type="text" id="p-${k}" data-p="${k}" value="${esc((S.profile||{})[k]||'')}" placeholder="${esc(DEFAULT_ME[k]||'')}" autocomplete="off"></div>`;
+ return head('Настройки','')+`<div class="box"><h3>Облако</h3>${cloud}</div>
+  <div class="box"><h3>Профиль агента — для карты клиента</h3>${fld('name','Имя')}${fld('role','Должность и компания')}${fld('phone','Телефон')}${fld('tg','Telegram')}${fld('site','Сайт')}${fld('office','Офис')}
+   <div class="it"><div class="q">Фото</div><div class="row"><img src="${p.photo||MEPHOTO}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover"><input type="file" id="photoIn" accept="image/*"><button class="ibtn" type="button" id="photoDel"${(S.profile||{}).photo?'':' hidden'}>Вернуть фото из бренд-кита</button></div></div>
+   <p class="note">Пустое поле — берётся значение по умолчанию (серым).</p></div>`;}
+function bindSet(){const l=$('#loginBtn');if(l)l.onclick=()=>{if(!cid()){go('set');setTimeout(()=>{const c=$('#cidIn');if(c)c.focus();},50);return;}Sync.signIn(G.get('on',false)?'':'consent');};
+ const s=$('#syncNow');if(s)s.onclick=()=>Sync.run(true);
+ const o=$('#outBtn');if(o)o.onclick=()=>Sync.signOut(false);
+ const w=$('#wipeBtn');if(w)w.onclick=()=>{if(w.dataset.armed)Sync.signOut(true);else{w.dataset.armed=1;w.textContent='Точно стереть с устройства?';}};}
+
+/* ================= NAV ================= */
+function renderTabs(){const tabs=$('#tabs');const list=T()?T().tabs:['start'];let n=0;
+ tabs.innerHTML=(T()?['start'].concat(list):list).map(id=>{const lbl=id==='start'?'Тип встречи':TL[id];const numb=(id==='start'||id==='map'||id==='sum')?'':'<b>'+(++n)+'</b>';
+  return `<button type="button" class="tab${id==='map'?' client':''}${id===S.tab?' active':''}" data-t="${id}">${numb}${lbl}</button>`;}).join('');}
+function go(id,keep){if(!T()&&id!=='start'&&id!=='set')id='start';S.tab=id;save();const y=window.scrollY;
+ $('#panel').innerHTML=P[id]();$('#layout').classList.toggle('wide',id==='map'||id==='start'||id==='set');renderTabs();refreshSide();bind();
+ const a=$('#tabs .active');if(a&&!keep)a.scrollIntoView({block:'nearest',inline:'center'});window.scrollTo({top:keep?y:0});}
+function refreshSide(){$('#rail').innerHTML=rail();const f=F();$('#typechip').hidden=!T();$('#typechip').textContent=T()?T().label:'';
+ $('#who').innerHTML=f.name?'<b>'+esc(f.name)+'</b>'+(f.addr?' · '+esc(f.addr):''):(T()?'Новая встреча':'');}
+function startType(k){if(Object.keys(F()).length&&S.cur.type)S.arch.unshift(S.cur);S.cur=blank(k);save(true);go(TYPES[k].tabs[0]);}
+
+/* ================= EVENTS ================= */
+document.addEventListener('click',e=>{
+ const tb=e.target.closest('.tab');if(tb){go(tb.dataset.t);return;}
+ const tc=e.target.closest('[data-type]');if(tc){startType(tc.dataset.type);return;}
+ const b=e.target.closest('[data-ch]');if(b){const k=b.dataset.ch,v=b.dataset.v,f=F();
+  if(b.dataset.m==='1'){const a=arr(f[k]);f[k]=a.includes(v)?a.filter(x=>x!==v):a.concat(v);}else f[k]=f[k]===v?'':v;save(true);go(S.tab,true);return;}
+ const o=e.target.closest('[data-open]');if(o){const i=+o.dataset.open,m=S.arch.splice(i,1)[0];if(S.cur.type&&Object.keys(F()).length)S.arch.unshift(S.cur);S.cur=m;save();go(T().tabs[0]);return;}
+ const d=e.target.closest('[data-del]');if(d){if(d.dataset.armed){const m=S.arch.splice(+d.dataset.del,1)[0];if(m)S.del[m.id]=Date.now();save();Sync.later();go(S.tab,true);}else{d.dataset.armed=1;d.textContent='Точно удалить?';}return;}
+ if(e.target.id==='sample'){startType('so');Object.assign(F(),{name:'Пример: Ольга',phone:'+7 900 000-00-00',addr:'ул. Пример, 10',src:'Авито',adprice:'4600000',days:'45',mktMin:'4100000',mktMax:'4400000',
+  why:['Обмен на большую'],buyNext:'Новостройку',deadline:'до лета',pain:'Двое детей в одной комнате, старший идёт в школу',decide:['Супруг(а)'],tried:'Полтора месяца на Авито, 6 звонков, 2 показа',important:['Безопасность','Цена'],
+  rooms:'2',area:'52',floor:'5/9',house:'Панель',state:'Косметика',replan:'Нет',owners:'4',basis:'Купля-продажа',years:'6',onlyHome:'Да',spouse:'Да',msk:'Да, доли не выделены',minors:'Да',mort:'Да',mortBank:'Сбер',mortLeft:'900000',reg:'4',debts:'Нет',
+  expect:'4600000',strat:'Тест 3 недели выше рынка',temp:'Тёплый'});save(true);go('map');}});
+document.addEventListener('change',e=>{const t=e.target;
+ if(t.dataset.k&&t.type==='checkbox'){F()[t.dataset.k]=t.checked;t.closest('.chk').classList.toggle('done',t.checked);save(true);refreshSide();}
+ if(t.dataset.c){C()[t.dataset.c]=t.checked;save(true);go(S.tab,true);}
+ if(t.id==='photoIn'&&t.files[0]){const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const cv=document.createElement('canvas'),s=240;cv.width=cv.height=s;const m=Math.min(img.width,img.height);
+  cv.getContext('2d').drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,s,s);S.profile.photo=cv.toDataURL('image/jpeg',.85);S.profile.updated=Date.now();save();Sync.later();go('set',true);};img.src=r.result;};r.readAsDataURL(t.files[0]);}});
+let tmr=null;
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset.p){S.profile[t.dataset.p]=t.value;S.profile.updated=Date.now();save();Sync.later();return;}
+ if(t.id==='cidIn'){G.set('cid',t.value.trim());return;}
+ if(t.dataset.k&&t.type!=='checkbox'){F()[t.dataset.k]=t.value;save(true);refreshSide();
+ if(/calc|price|rstats|rtalk|bmoney/.test(S.tab)){clearTimeout(tmr);tmr=setTimeout(()=>{const id=t.id,pos=t.selectionStart;go(S.tab,true);const n=document.getElementById(id);if(n){n.focus();try{n.setSelectionRange(pos,pos);}catch(x){}}},700);}}});
+function bind(){const c=$('#copyOut');if(c)c.onclick=()=>{const t=$('#out').textContent,ok=()=>{$('#copied').hidden=false;setTimeout(()=>$('#copied').hidden=true,1500);},
+  sel=()=>{const r=document.createRange();r.selectNodeContents($('#out'));const s=getSelection();s.removeAllRanges();s.addRange(r);};try{navigator.clipboard.writeText(t).then(ok,sel);}catch(x){sel();}};
+ const p=$('#printMap');if(p)p.onclick=()=>window.print();
+ const pd=$('#photoDel');if(pd)pd.onclick=()=>{S.profile.photo='';S.profile.updated=Date.now();save();Sync.later();go('set',true);};
+ bindSet();
+ const sa=$('#saveArch');if(sa)sa.onclick=()=>{if(Object.keys(F()).length)S.arch.unshift(S.cur);S.cur=blank('');save();go('start');};}
+let armedNew=false;
+$('#newMeet').onclick=()=>{const b=$('#newMeet');if(T()&&Object.keys(F()).length&&!armedNew){armedNew=true;b.textContent='Сохранить текущую и начать?';setTimeout(()=>{armedNew=false;b.textContent='Новая встреча';},4000);return;}
+ armedNew=false;b.textContent='Новая встреча';if(T()&&Object.keys(F()).length)S.arch.unshift(S.cur);S.cur=blank('');save();go('start');};
+window.addEventListener('beforeprint',()=>{if(S.tab!=='map'&&T())go('map');});
+$('#setBtn').onclick=()=>go('set');
+$('#cloud').onclick=()=>{if(!token())Sync.signIn('');else Sync.run(true);};
+Sync.boot();
+go(S.tab||'start');
+window.__test={TYPES,go,startType,S:()=>S};
+})();
+</script>
+
+<script>if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js");</script>
+</body></html>
