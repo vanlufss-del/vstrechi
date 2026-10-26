@@ -207,6 +207,18 @@ details.obj .in em{font-style:normal;color:var(--muted);font-size:12px;display:b
 <style>
 .cloud.ok{color:var(--ok)}.cloud.warn{color:var(--accent);border-color:var(--accent)}
 a.ibtn{text-decoration:none;color:var(--fg);display:inline-block}
+.ctimer{display:flex;align-items:center;gap:6px}
+.clock{font-family:var(--display);font-weight:500;font-size:18px;font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
+.clock.late{color:var(--accent)}
+.tab.now{border-color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent)}
+.ckbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.ckbar b{font-family:var(--display);font-weight:500;font-size:15px;margin-right:4px}
+.ckbar span{border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:2px 7px}
+.ckbar.done{border-color:var(--ok)} .ckbar.done b{color:var(--ok)}
+.cklist{display:flex;flex-direction:column;gap:4px;font-size:14px}
+.cklist div::before{content:"○ ";color:var(--accent)} .cklist div.ok{color:var(--muted)} .cklist div.ok::before{content:"✓ ";color:var(--ok)}
+.casecard{border:2px solid var(--accent);background:var(--accent-soft);border-radius:14px;padding:14px;font-size:16px}
+.casecard i{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:4px}
 .typechip{font-size:12px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:8px;padding:4px 8px;white-space:nowrap}
 .start{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
 .tcard{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:14px;cursor:pointer;display:flex;flex-direction:column;gap:4px;min-width:0}
@@ -227,7 +239,7 @@ a.ibtn{text-decoration:none;color:var(--fg);display:inline-block}
   <div class="wrap">
     <div class="top">
       <div class="brand">Встречи <i>с клиентами</i></div>
-      <span class="typechip" id="typechip" hidden></span>
+      <span class="typechip" id="typechip" hidden></span><div class="ctimer" id="ctimer" hidden><span class="clock" id="clock">15:00</span><button class="ibtn primary" id="tgo" type="button">Старт</button><button class="ibtn" id="treset" type="button" aria-label="Сбросить таймер">↺</button></div>
       <div class="who" id="who"></div>
       <button class="ibtn cloud" id="cloud" type="button" hidden></button><button class="ibtn" id="setBtn" type="button" aria-label="Настройки">Настройки</button><button class="ibtn" id="newMeet" type="button">Новая встреча</button>
     </div>
@@ -256,10 +268,11 @@ const TYPES={
  ex:{label:'Обмен',kind:'ex',when:'Продать своё и купить новое одной сделкой',tabs:['prep','contact','sit','obj','docs','price','bneed','bmoney','xpres','xcalc','objn','deal','map','sum'],def:{gp:'4000',term:'20'}},
  rv:{label:'Встреча о цене',kind:'rev',when:'Через 3 недели рекламы: отчёт и решение по цене',tabs:['rprep','rcontact','rstats','rtalk','robjn','rdeal','map','sum']},
  nb:{label:'Новостройка',kind:'nb',when:'Покупка в новостройке: подбор ЖК, бронь, ипотека',tabs:['bprep','bcontact','nneed','bmoney','npres','bcalc','nobjn','ndeal','map','sum'],def:{gp:'4000',term:'20',seg:'Новостройка'}},
- ih:{label:'Наследство и доли',kind:'sell',when:'Продажа унаследованного, несколько собственников',tabs:['prep','contact','sit','inh','obj','docs','price','pres','calc','objn','deal','map','sum'],def:{basis:'Наследство'}}};
+ ih:{label:'Наследство и доли',kind:'sell',when:'Продажа унаследованного, несколько собственников',tabs:['prep','contact','sit','inh','obj','docs','price','pres','calc','objn','deal','map','sum'],def:{basis:'Наследство'}},
+ cert:{label:'Сертификация',kind:'cert',when:'Ролевая игра «Встреча в офисе»: 15 минут с РОП и руководителем',tabs:['c_case','c_contact','c_needs','c_pres','c_calc','c_objn','c_close','map','sum'],def:{gp:'4000',term:'20'}}};
 const TL={prep:'Подготовка',contact:'Контакт',door:'Знакомство',walk:'Осмотр',sit:'Ситуация',inh:'Наследство',obj:'Объект',docs:'Документы',price:'Цена',pres:'Презентация',calc:'Расчёт',objn:'Возражения',deal:'Договор',
  bprep:'Подготовка',bcontact:'Контакт',bneed:'Потребности',nneed:'Потребности',bmoney:'Деньги',bpres:'Презентация',npres:'Презентация',bcalc:'Расчёт',bobjn:'Возражения',nobjn:'Возражения',bdeal:'Договор',ndeal:'Договор',
- xpres:'Презентация',xcalc:'Расчёт обмена',rprep:'Подготовка',rcontact:'Контакт',rstats:'Цифры',rtalk:'Разговор о цене',robjn:'Возражения',rdeal:'Решение',map:'Карта клиента',sum:'Итог для меня',set:'Настройки'};
+ xpres:'Презентация',xcalc:'Расчёт обмена',rprep:'Подготовка',rcontact:'Контакт',rstats:'Цифры',rtalk:'Разговор о цене',robjn:'Возражения',rdeal:'Решение',map:'Карта клиента',sum:'Итог для меня',set:'Настройки',c_case:'Кейс',c_contact:'Контакт',c_needs:'Потребности',c_pres:'Презентация',c_calc:'Расчёт',c_objn:'Возражения',c_close:'Завершение'};
 
 /* ================= SCHEMA ================= */
 const ch=(id,q,o,h,x)=>Object.assign({id,q,t:'one',o,h},x||{});
@@ -278,6 +291,8 @@ const SCH={
  sit:[mu('why','Почему решили продавать?',['Обмен на большую','Обмен на меньшую','Переезд в другой город','Купили другое жильё','Нужны деньги','Наследство','Разъезд','Другое']),
   ta('whyTxt','Его словами',''),
   ch('buyNext','Что покупаете взамен?',['Пока не решили','Вторичку','Новостройку','Дом','Ничего'],'Если покупает — это ещё и заявка на покупателя'),
+  ch('second','Есть ещё объект на продажу?',['Нет','Дом','Дача / участок','Вторая квартира'],'Например, дом на доплату'),
+  nu('secondPrice','Цена второго объекта, ₽',null,{show:f=>f.second&&f.second!=='Нет'}),
   tx('deadline','К какому сроку важно продать?'),
   ta('pain','Что будет, если не продадите к этому сроку?','Это боль клиента — используй её в презентации'),
   mu('decide','Кто ещё принимает решение?',['Только он(а)','Супруг(а)','Дети / родители','Совладельцы']),
@@ -315,7 +330,7 @@ const SCH={
  price:[nu('expect','Какую цену хотите получить?'),nu('min','Ниже какой суммы точно не готовы?','Не озвучивать в рекламе'),
   ch('strat','Стратегия',['В рынке','Тест 3 недели выше рынка','Быстрая продажа'],'«Тестируем 3 недели, потом возвращаемся к цене»')],
  deal:[ch('contract','Агентский договор',['Эксклюзивный','Стандартный','Пока не подписали']),ck('pdn','Согласие на обработку персональных данных'),ck('lk','Зарегистрирован в личном кабинете'),
-  tx('viewDate','Осмотр объекта — когда'),tx('photoDate','Фотосессия — когда'),tx('nextContact','Следующий контакт — когда и как'),
+  tx('viewDate','Осмотр объекта — когда'),tx('photoDate','Фотосессия — когда'),tx('podb','Подборку отправлю — когда',null,{show:()=>isEx()}),tx('shows','Показы — когда',null,{show:()=>isEx()}),tx('nextContact','Следующий контакт — когда и как'),
   ch('temp','Насколько горячий клиент',['Горячий','Тёплый','Холодный'],'Только для тебя, в карту клиента не попадает'),ta('extra','Что ещё важно (для меня)','')],
 
  bprep:[tx('name','Имя клиента'),tx('phone','Телефон / MAX / Telegram'),
@@ -427,7 +442,7 @@ const OB_REV=[
  ['Мне не срочно','Имя, а какой срок вас устроит?','Понимаю. Тогда давайте не снижать, а усилить подачу: новые фото, описание, платные статусы. И зафиксируем дату, когда смотрим снова. Хорошо?']];
 
 /* ================= STATE ================= */
-const blank=t=>({id:Date.now(),date:new Date().toISOString().slice(0,10),type:t||'',f:Object.assign({},(TYPES[t]||{}).def||{}),c:{}});
+const blank=t=>{const d=Object.assign({},(TYPES[t]||{}).def||{});if(d.gp)d.gp=String(TF().gp);return {id:Date.now(),date:new Date().toISOString().slice(0,10),type:t||'',f:d,c:{}};};
 let S={cur:blank(''),arch:[],tab:'start',photo:'',profile:{},del:{}};
 try{const r=localStorage.getItem('vstrechi2');if(r)S=Object.assign(S,JSON.parse(r));
  else{const o=localStorage.getItem('vstrechaProdavec');if(o){const p=JSON.parse(o);S.arch=(p.arch||[]).map(m=>Object.assign(m,{type:'so'}));if(p.cur&&Object.keys(p.cur.f||{}).length){p.cur.type='so';S.arch.unshift(p.cur);}S.photo=p.photo||'';}}}catch(e){}
@@ -445,20 +460,29 @@ const mln=n=>(n/1e6).toLocaleString('ru-RU',{maximumFractionDigits:2})+' млн'
 const nm=()=>esc((F().name||'').trim()||'Имя');
 const N=()=>'<span class="nm">'+nm()+'</span>';
 const arr=v=>Array.isArray(v)?v:(v?[v]:[]);
-const kind=()=>T()?T().kind:'';
+const kind=()=>{if(!T())return '';if(S.cur.type==='cert')return F().ck||'ex';return T().kind;};
+function isEx(){return S.cur.type==='ex'||(S.cur.type==='cert'&&kind()==='ex');}
+const TF_DEF={sPct:2.8,sMin:72000,s8:2.4,bPct:2,bMin:72000,zBase:72000,zPct:1.6,exD:5,gp:4000};
+function TF(){const t=Object.assign({},TF_DEF),u=(S.profile||{}).tf||{};Object.keys(t).forEach(k=>{const v=parseFloat(String(u[k]||'').replace(',','.'));if(!isNaN(v))t[k]=v;});return t;}
+const pc=v=>String(v).replace('.',',')+'%';
 
 /* ================= LOGIC ================= */
-function isAlt(f){return S.cur.type==='ex'||(f.buyNext&&!['Ничего','Пока не решили'].includes(f.buyNext))||arr(f.why).some(x=>x.startsWith('Обмен'));}
-function sellComm(p){return p<=0?0:p<8e6?Math.max(.028*p,72000):.024*p;}
-function buyComm(p,seg,disc){if(p<=0||seg==='Новостройка')return 0;let c=seg==='Дом'?(p<=2e6?72000:72000+.016*p):Math.max(.02*p,72000);return disc?c*.95:c;}
+function isAlt(f){return isEx()||(f.buyNext&&!['Ничего','Пока не решили'].includes(f.buyNext))||arr(f.why).some(x=>x.startsWith('Обмен'));}
+function sellComm(p){const t=TF();return p<=0?0:p<8e6?Math.max(t.sPct/100*p,t.sMin):t.s8/100*p;}
+function zagSellComm(p){const t=TF();return p<=0?0:p<=2e6?t.zBase:p<=8e6?t.zBase+t.zPct/100*p:t.s8/100*p;}
+const isLand=v=>v==='Дом'||v==='Дача / участок';
+function buyComm(p,seg,disc){const t=TF();if(p<=0||seg==='Новостройка')return 0;let c=seg==='Дом'?(p<=2e6?t.zBase:t.zBase+t.zPct/100*p):Math.max(t.bPct/100*p,t.bMin);return disc?c*(1-t.exD/100):c;}
 function minTerm(f){return (['Наследство','Приватизация','Дарение'].includes(f.basis)||f.onlyHome==='Да')?3:5;}
 function tax(f,p){const y=num(f.years);if(!f.basis||f.years===undefined||f.years==='')return 0;if(y>=minTerm(f))return 0;
  const base=Math.max(0,p-Math.max(num(f.buyPrice),1e6));return base<=2.4e6?base*.13:2.4e6*.13+(base-2.4e6)*.15;}
 function annuity(L,r,y){if(L<=0||!y)return 0;const i=r/1200,n=y*12;return i?L*i/(1-Math.pow(1+i,-n)):L/n;}
+function kidsShares(f){return (f.msk&&f.msk!=='Нет')||f.minors==='Да';}
 function sellCalc(){const f=F(),p=num(f.dealPrice)||num(f.expect)||num(f.adprice),k=sellComm(p),m=f.mort==='Да'?num(f.mortLeft):0,
- no=f.msk==='Да, доли не выделены'?num(f.notary):0,t=tax(f,p),o=num(f.other);return {p,k,m,no,t,o,net:p-k-m-no-t-o};}
+ no=kidsShares(f)?num(f.notary):0,t=tax(f,p),o=num(f.other);
+ const p2=f.second&&f.second!=='Нет'?num(f.secondPrice):0,k2=p2?(isLand(f.second)?zagSellComm(p2):sellComm(p2)):0;
+ return {p,k,m,no,t,o,p2,k2,net:p+p2-k-k2-m-no-t-o};}
 function buyCalc(extraOwn){const f=F(),seg=S.cur.type==='nb'?'Новостройка':(f.seg||'Вторичка'),p=num(f.bprice)||num(f.budget);
- const k=buyComm(p,seg,S.cur.type==='ex'),own=num(f.own)+(extraOwn||0),msk=num(f.mskSum),cert=num(f.cert);
+ const k=buyComm(p,seg,isEx()),own=num(f.own)+(extraOwn||0),msk=num(f.mskSum),cert=num(f.cert);
  const mortOn=arr(f.pay).includes('Ипотека')||(S.cur.type==='nb'&&f.program&&f.program!=='Без ипотеки');
  const gp=num(f.gp),ocen=mortOn?(seg==='Дом'?5000:3000):0,ins=mortOn?num(f.ins):0,er=num(f.ereg),sa=num(f.safe);
  const costs=k+gp+ocen+ins+er+sa;const loan=mortOn?Math.max(0,p-own-msk-cert):0;
@@ -469,7 +493,8 @@ function risks(){const f=F(),r=[],t=S.cur.type,k=kind();if(!k)return r;
   if(p&&mx&&p>mx)r.push('Цена выше рынка на '+Math.round((p/mx-1)*100)+'% — тест 3 недели и отчёт');
   if(p&&mn&&p<mn)r.push('Цена ниже рынка — можно продать дороже');
   if(f.msk==='Да, доли не выделены')r.push('Маткапитал: доли не выделены — нотариус до продажи');
-  if(f.msk&&f.msk!=='Нет'||f.minors==='Да')r.push('Дети-собственники: разрешение опеки, детям — доли не меньше в новом жилье');
+  if(kidsShares(f))r.push('Доли детей: сделка у нотариуса (расходы), разрешение опеки, детям — доли не меньше в новом жилье');
+  if(f.second&&f.second!=='Нет')r.push('Второй объект ('+f.second.toLowerCase()+') — продаётся дольше, начинаем сразу'+(isLand(f.second)?'; документы на дом и землю, оценка дома для банка 5 000':''));
   if(f.mort==='Да')r.push('Ипотека'+(f.mortBank?' ('+f.mortBank+')':'')+': справка об остатке, согласование с банком');
   if(f.spouse==='Да')r.push('Нужно нотариальное согласие супруга');
   if(num(f.owners)>1)r.push('Собственников '+num(f.owners)+' — все участвуют в сделке');
@@ -522,15 +547,16 @@ function corridor(cur,curLbl){const f=F(),mn=num(f.mktMin),mx=num(f.mktMax),e=nu
 /* ================= CALC PANELS ================= */
 function sellCalcHTML(){const f=F(),c=sellCalc();
  return `<div class="box">${item(nu('dealPrice','Цена для расчёта, ₽','Пусто — берём ожидание клиента или цену из объявления'))}
-  ${f.msk==='Да, доли не выделены'?item(nu('notary','Нотариус: выделение долей, ₽','Уточни у юриста')):''}${item(nu('other','Прочие расходы, ₽','Справки, выписки, нотариус и т.п.'))}</div>
- <div class="res"><div class="r"><span>Цена продажи</span><b>${rub(c.p)}</b></div><div class="r good"><span>Вам на руки (ориентир)</span><b>${rub(c.net)}</b></div></div>
+  ${kidsShares(f)?item(nu('notary','Нотариус: сделка с долями детей'+(f.msk==='Да, доли не выделены'?' и выделение долей':'')+', ₽','Сделка с долями несовершеннолетних удостоверяется нотариусом — уточни стоимость у юриста')):''}${item(nu('other','Прочие расходы, ₽','Справки, выписки, нотариус и т.п.'))}</div>
+ <div class="res"><div class="r"><span>Цена продажи${c.p2?' (квартира + '+esc(f.second.toLowerCase())+')':''}</span><b>${rub(c.p+c.p2)}</b></div><div class="r good"><span>Вам на руки (ориентир)</span><b>${rub(c.net)}</b></div></div>
  <div class="box"><table class="ledger">
-  <tr><td>Комиссия<small>${c.p<8e6?'2,8%, не менее 72 000 ₽':'2,4%'} · только по факту сделки</small></td><td>${rub(c.k)}</td></tr>
+  <tr><td>Комиссия<small>${c.p<8e6?pc(TF().sPct)+', не менее '+rub(TF().sMin):pc(TF().s8)} · только по факту сделки</small></td><td>${rub(c.k)}</td></tr>
+  ${c.p2?`<tr><td>Продажа: ${esc(f.second.toLowerCase())}<small>цена второго объекта</small></td><td>+ ${rub(c.p2)}</td></tr><tr><td>Комиссия за ${esc(f.second.toLowerCase())}<small>${isLand(f.second)?'тариф загородки':'тариф вторички'}</small></td><td>${rub(c.k2)}</td></tr>`:''}
   ${c.m?`<tr><td>Погашение ипотеки<small>${esc(f.mortBank||'')}</small></td><td>${rub(c.m)}</td></tr>`:''}
-  ${c.no?`<tr><td>Нотариус, доли детей</td><td>${rub(c.no)}</td></tr>`:''}
+  ${c.no?`<tr><td>Нотариус, доли детей</td><td>${rub(c.no)}</td></tr>`:(kidsShares(f)?`<tr><td>Нотариус, доли детей<small>впиши стоимость выше</small></td><td>—</td></tr>`:'')}
   <tr><td>Налог на доход от продажи<small>${c.t?'владение меньше '+minTerm(f)+' лет · предварительно':(f.basis&&f.years?'не платите: срок владения '+num(f.years)+' лет ≥ '+minTerm(f):'укажи основание и срок владения во вкладке «Документы»')}</small></td><td>${rub(c.t)}</td></tr>
   ${c.o?`<tr><td>Прочие расходы</td><td>${rub(c.o)}</td></tr>`:''}
-  <tr class="total"><td>Вам на руки</td><td>${rub(c.net)}</td></tr></table></div>
+  <tr class="total"><td>Вам на руки${c.p2?' (за оба объекта)':''}</td><td>${rub(c.net)}</td></tr></table></div>
  <p class="note">Налог: 13% с дохода до 2,4 млн и 15% сверху; вычет — 1 млн ₽ или расходы на покупку. Минимальный срок владения 3 года (наследство — с даты открытия, приватизация, дарение от родственника, единственное жильё), иначе 5. Если цена ниже 70% кадастровой стоимости, налог считают от 70% кадастра. Семьи с 2+ детьми при покупке нового жилья могут быть освобождены. Точный расчёт — юрист.</p>`;}
 function buyCalcHTML(extra){const f=F(),b=buyCalc(extra);
  return `<div class="box">${item(nu('bprice','Цена квартиры для расчёта, ₽','Пусто — берём бюджет'))}${item(nu('gp','Госпошлина за регистрацию, ₽'))}
@@ -539,7 +565,7 @@ function buyCalcHTML(extra){const f=F(),b=buyCalc(extra);
  <div class="res"><div class="r"><span>Цена покупки</span><b>${rub(b.p)}</b></div>
   ${b.mortOn?`<div class="r key"><span>Сумма кредита</span><b>${rub(b.loan)}</b></div><div class="r good"><span>Платёж в месяц${num(f.rate)?'':' (укажи ставку)'}</span><b>${rub(b.pm)}</b></div>`:`<div class="r ${b.gap?'key':'good'}"><span>${b.gap?'Не хватает':'Денег хватает'}</span><b>${rub(b.gap)}</b></div>`}</div>
  <div class="box"><table class="ledger">
-  <tr><td>Комиссия${b.seg==='Новостройка'?'<small>новостройка — без комиссии</small>':'<small>'+(S.cur.type==='ex'?'2%, со скидкой 5% при обмене':'2%, не менее 72 000 ₽')+' · по факту сделки</small>'}</td><td>${rub(b.k)}</td></tr>
+  <tr><td>Комиссия${b.seg==='Новостройка'?'<small>новостройка — без комиссии</small>':'<small>'+(isEx()?pc(TF().bPct)+', со скидкой '+TF().exD+'% при обмене':pc(TF().bPct)+', не менее '+rub(TF().bMin))+' · по факту сделки</small>'}</td><td>${rub(b.k)}</td></tr>
   ${b.gp?`<tr><td>Госпошлина</td><td>${rub(b.gp)}</td></tr>`:''}${b.ocen?`<tr><td>Оценка для банка</td><td>${rub(b.ocen)}</td></tr>`:''}
   ${b.ins?`<tr><td>Страховка</td><td>${rub(b.ins)}</td></tr>`:''}${b.er?`<tr><td>Электронная регистрация</td><td>${rub(b.er)}</td></tr>`:''}${b.sa?`<tr><td>Безопасные расчёты</td><td>${rub(b.sa)}</td></tr>`:''}
   <tr class="total"><td>Расходы по сделке</td><td>${rub(b.costs)}</td></tr></table></div>
@@ -548,17 +574,18 @@ function buyCalcHTML(extra){const f=F(),b=buyCalc(extra);
 /* ================= PANELS ================= */
 const P={
  start:()=>loginCard()+head('Какая встреча?','Выбери тип — вопросы, скрипты, расчёт и карта клиента подстроятся под него.')+
-  '<div class="start">'+Object.entries(TYPES).map(([k,t])=>`<button type="button" class="tcard" data-type="${k}"><i>${t.kind==='sell'||t.kind==='rev'?'Продавец':t.kind==='ex'?'Продажа + покупка':'Покупатель'}</i><b>${t.label}</b><span>${t.when}</span></button>`).join('')+'</div>'+
+  (S.profile.certDone?'':`<button type="button" class="tcard" data-type="cert" style="border-color:var(--accent);margin-bottom:12px;width:100%"><i>Для новичков · можно скрыть в настройках</i><b>Сертификация · Встреча в офисе</b><span>Таймер 15 минут, 6 этапов по презентации компании, анкета-чек-лист и тренировка на случайных кейсах</span></button>`)+
+  '<div class="start">'+Object.entries(TYPES).filter(([k])=>k!=='cert').map(([k,t])=>`<button type="button" class="tcard" data-type="${k}"><i>${t.kind==='sell'||t.kind==='rev'?'Продавец':t.kind==='ex'?'Продажа + покупка':'Покупатель'}</i><b>${t.label}</b><span>${t.when}</span></button>`).join('')+'</div>'+
   `<div class="box"><h3>Сохранённые встречи</h3>${archHTML()}</div><div class="row"><button class="ibtn" type="button" id="sample">Открыть пример встречи</button></div>`,
  prep:()=>head('Подготовка к встрече','Заполни до прихода клиента. Цифры коридора — из аналитической справки Космоса.')+fields('prep')+
   '<div class="box"><h3>Взять с собой</h3>'+chkList([['p1','Агентский договор, 2 экземпляра'],['p2','Аналитическая справка по объекту'],['p3','Согласие на обработку ПДн'],['p4','Визитки'],['p5',S.cur.type==='ss'?'Телефон заряжен для фото, штатив':'Ноутбук открыт на этом пульте']])+'</div>',
  contact:()=>head('Контакт и повестка','Первые 2 минуты. Клиент должен понять, что уйдёт с готовым планом.')+
-  says([`Здравствуйте, ${N()}! Рад, что пришли. Чай или кофе? Давайте помогу с верхней одеждой.`,
-   `${N()}, предлагаю так: сначала я задам вопросы про вашу ситуацию${S.cur.type==='ex'?', квартиру и что хотите купить':' и квартиру'}, потом покажу, как мы будем действовать, посчитаем${S.cur.type==='ex'?' бюджет на покупку':', сколько вы получите на руки'}, и вы уйдёте с готовой дорожной картой. Около 40 минут. Подходит?`,
+  says([F().name?`Здравствуйте, ${N()}! Спасибо, что пришли в нашу компанию. Я буду вашим личным специалистом по недвижимости. Чай или кофе? Давайте помогу с верхней одеждой.`:`Здравствуйте! Спасибо, что пришли в нашу компанию. Меня зовут ${ME().name.split(' ')[0]}, я буду вашим личным специалистом по недвижимости. Как могу к вам обращаться? Чай или кофе? Давайте помогу с верхней одеждой.`,
+   `${N()}, предлагаю так: сначала я задам вопросы про вашу ситуацию${isEx()?', квартиру и что хотите купить':' и квартиру'}, потом покажу, как мы будем действовать, посчитаем${isEx()?' бюджет на покупку':', сколько вы получите на руки'}, и вы уйдёте с готовой дорожной картой. Около 40 минут. Подходит?`,
    `Я буду кое-что записывать, чтобы ничего не упустить из того, что для вас важно. Хорошо?`])+
   tip('Ноутбук:','поверни экран так, чтобы клиент видел, что ты записываешь его слова. Смотри на клиента: галочки и короткие пометки, подробности надиктуешь вечером.'),
  door:()=>head('Знакомство на объекте','Ты в гостях. Первые минуты — разуться, улыбнуться, найти, за что искренне похвалить квартиру.')+
-  says([`Здравствуйте, ${N()}! Иван, «Этажи». Спасибо, что пригласили. Куда можно разуться?`,
+  says([`Здравствуйте, ${N()}! ${ME().name.split(' ')[0]}, «Этажи». Спасибо, что пригласили. Куда можно разуться?`,
    `У вас очень светло / уютно / удачная планировка — сразу видно, что квартиру любят.`,
    `${N()}, предлагаю так: вы покажете мне квартиру — расскажете, что вам в ней нравится, я сделаю пару снимков. Потом сядем на кухне, посчитаем, сколько вы получите на руки, и составим план продажи. Около часа. Удобно?`])+
   tip('Смол-ток:','соседи, двор, сколько живут здесь. Искренний комплимент, без лести.'),
@@ -579,17 +606,17 @@ const P={
  objn:()=>head('Возражения','')+objBox(S.cur.type==='ih'?OB_INH.concat(OB_SELL):OB_SELL),
  deal:()=>head('Договор и следующие шаги','«'+nm()+', чтобы я начал работать на вашу продажу уже сегодня, подписываем агентский договор».')+
   says([`Эксклюзивный договор — это полный объём: платная реклама, фотосессия, отчёты и я лично на вашей квартире. Стандартный — минимум услуг. Для вашей задачи рекомендую эксклюзив. Оформляем?`,
-   S.cur.type==='ss'?`Сегодня же зарегистрирую вас в личном кабинете. Фото я сделал, профессиональную съёмку назначим на удобный день — когда?`:`Сегодня же зарегистрирую вас в личном кабинете. Договоримся об осмотре и фотосессии — когда вам удобно?`])+fields('deal'),
+   S.cur.type==='ss'?`Сегодня же зарегистрирую вас в личном кабинете. Фото я сделал, профессиональную съёмку назначим на удобный день — когда?`:`Сегодня же зарегистрирую вас в личном кабинете. Договоримся об осмотре и фотосессии — когда вам удобно?`].concat(isEx()?[`Как договорились, отправлю вам подборку по новой квартире и договорюсь о просмотрах на удобный день.`]:[]))+resumeBox()+fields('deal'),
 
  bprep:()=>head('Подготовка к встрече','Что известно до встречи. На дежурстве — заполняй по ходу.')+fields('bprep')+
   '<div class="box"><h3>Взять с собой</h3>'+chkList([['p1','Агентский договор на покупку, 2 экземпляра'],['p2','Бланки акта осмотра'],['p3','Согласие на обработку ПДн'],['p4','Визитки']])+'</div>',
- bcontact:()=>head('Контакт и повестка','')+says([`Здравствуйте! Спасибо, что пришли в нашу компанию. Меня зовут Иван, я буду вашим личным специалистом по недвижимости. Как могу к вам обращаться?`,
+ bcontact:()=>head('Контакт и повестка','')+says([`Здравствуйте! Спасибо, что пришли в нашу компанию. Меня зовут ${ME().name.split(' ')[0]}, я буду вашим личным специалистом по недвижимости. Как могу к вам обращаться?`,
    `${N()}, чай или кофе? Давайте помогу с верхней одеждой.`,
    `Предлагаю так: я задам вопросы, чтобы понять, что вам действительно нужно, потом посчитаем бюджет${S.cur.type==='nb'?' и платёж':' и платёж по ипотеке'}, и вы уйдёте с планом покупки по шагам. Минут 30–40. Хорошо?`]),
- bneed:()=>head(S.cur.type==='ex'?'Что хотите купить':'Потребности','Не предлагай варианты, пока не понял задачу. Главный вопрос: «Что для вас важно при выборе?»')+fields('bneed')+tip('Копай глубже:','«А почему именно этот район?», «А что будет, если не найдём к этому сроку?»'),
+ bneed:()=>head(isEx()?'Что хотите купить':'Потребности','Не предлагай варианты, пока не понял задачу. Главный вопрос: «Что для вас важно при выборе?»')+fields('bneed')+tip('Копай глубже:','«А почему именно этот район?», «А что будет, если не найдём к этому сроку?»'),
  nneed:()=>head('Потребности','Спроси, какие ЖК уже смотрел — это экономит время и показывает его критерии.')+fields('nneed'),
  bmoney:()=>head('Деньги','«Чтобы подобрать варианты, которые вы точно потянете, давайте посчитаем бюджет».')+fields('bmoney')+
-  (S.cur.type==='ex'?tip('Обмен:','деньги от продажи посчитаются сами во вкладке «Расчёт обмена» — здесь укажи только свои накопления сверх них.'):''),
+  (isEx()?tip('Обмен:','деньги от продажи посчитаются сами во вкладке «Расчёт обмена» — здесь укажи только свои накопления сверх них.'):''),
  bpres:()=>head('Презентация','Начни с того, что важно клиенту, а не с компании.')+
   `<div class="say">${N()}, правильно сделали, что обратились к нам. «Этажи» на рынке 23 года, мы №1 агентство по версии Сбербанка. Я буду вашим личным специалистом и отстаиваю ваши интересы.</div>`+utpBox(BUY_UTP),
  npres:()=>head('Презентация','')+`<div class="say">${N()}, правильно сделали, что пришли к нам: у нас все новостройки Кемерово в одном месте и без комиссии.</div>`+utpBox(NB_UTP)+
@@ -598,8 +625,8 @@ const P={
  bobjn:()=>head('Возражения покупателя','')+objBox(OB_BUY),
  nobjn:()=>head('Возражения','')+objBox(OB_NB),
  bdeal:()=>head('Договор и следующие шаги','«'+nm()+', чтобы я начал подбор и мог показывать вам квартиры, подписываем агентский договор».')+
-  says([`Договор фиксирует, что я работаю на вас, а платите вы только по факту сделки. Сегодня же отправлю первую подборку.`,`Акт осмотра подпишем на первом показе — так положено, это защищает и вас, и меня.`,`Предлагаю сразу подать заявку в наш ипотечный отдел — по 2 документам, это ни к чему не обязывает. Паспорт и СНИЛС с собой?`])+fields('bdeal'),
- ndeal:()=>head('Договор и следующие шаги','')+says([`${N()}, подписываем агентский договор — это бесплатно для вас, комиссии нет. Зато я бронирую, веду ипотеку и проверяю договор.`,`Предлагаю съездить по 2–3 ЖК вместе — когда вам удобно?`])+fields('ndeal'),
+  says([`Договор фиксирует, что я работаю на вас, а платите вы только по факту сделки. Сегодня же отправлю первую подборку.`,`Акт осмотра подпишем на первом показе — так положено, это защищает и вас, и меня.`,`Предлагаю сразу подать заявку в наш ипотечный отдел — по 2 документам, это ни к чему не обязывает. Паспорт и СНИЛС с собой?`])+resumeBox()+fields('bdeal'),
+ ndeal:()=>head('Договор и следующие шаги','')+says([`${N()}, подписываем агентский договор — это бесплатно для вас, комиссии нет. Зато я бронирую, веду ипотеку и проверяю договор.`,`Предлагаю съездить по 2–3 ЖК вместе — когда вам удобно?`])+resumeBox()+fields('ndeal'),
 
  xpres:()=>head('Презентация обмена','Главная выгода — всё в один день и одни руки на обе сделки.')+
   `<div class="say">${N()}, правильно сделали, что обратились к нам. Обмен — самая сложная сделка: нужно одновременно продать, купить и всё совместить по срокам. Мы делаем это каждый день: 23 года на рынке, №1 агентство по версии Сбербанка.</div>`+utpBox(XPRES),
@@ -630,13 +657,92 @@ const P={
   ${Sync.on()?`<p class="note">Встреча сохраняется в твою Google-таблицу «${CFG.sheetTitle}» — Claude может прочитать её сам, копировать не обязательно.</p>`:''}`;},
  set:()=>setHTML()};
 
+function resumeText(){const k=kind(),f=F();const goal=k==='buy'||k==='nb'?buyGoal():k==='ex'?sellGoal().replace(/\.$/,'')+'. '+buyGoal():sellGoal();
+ const st=(k==='ex'?exSteps():k==='nb'?nbSteps():k==='buy'?buySteps():sellSteps()).slice(0,6).map(x=>x[1].toLowerCase()).join(' → ');
+ let money='';if(k==='sell'||k==='ex'){const c=sellCalc();if(c.p)money+=' На руки от продажи — около '+rub(c.net)+'.';}
+ if(k==='buy'||k==='nb'||k==='ex'){const b=buyCalc(k==='ex'?Math.max(sellCalc().net,0):0);if(b.p)money+=' Расходы по покупке — около '+rub(b.costs)+(b.mortOn&&num(f.rate)?', платёж — около '+rub(b.pm)+' в месяц':'')+'.';}
+ return 'Резюмирую. '+goal+' Действуем так: '+st+'.'+money+' Комиссию платите только по факту сделки, на сделке компания выдаёт гарантийный сертификат.';}
+const resumeBox=()=>'<div class="box"><h3>Остались вопросы? Резюме</h3>'+says([N()+', остались ли у вас вопросы?','<span id="resumeTxt">'+esc(resumeText())+'</span>'])+'</div>';
+
+/* ================= CERTIFICATION ================= */
+const CASES=[
+ {t:'У меня 2-комнатная квартира с детскими долями, двое детей, хочу расшириться. Есть ещё дом на продаже — на доплату.',ck:'ex',tag:'Кейс из презентации',must:['Маткапитал и доли детей → сделка у нотариуса (расходы) и разрешение опеки','Детям — доли в новой квартире не меньше прежних','Дом: документы на дом и землю, продаётся дольше, оценка 5 000','Встречная сделка в один день, безопасные расчёты','Добрать ипотекой: по 2 документам, ставка ниже, чем в банке','Посчитать все расходы итого']},
+ {t:'Хочу купить первую квартиру в ипотеку, есть немного на первый взнос.',ck:'buy',must:['Ипотека через нас: 2 документа, ставка ниже, экономия до 250 тыс.','Страховка дешевле на 30–40%','Бюджет и комфортный платёж','Расходы: госпошлина 4 000, оценка 3 000, эл. регистрация, безопасные расчёты']},
+ {t:'Продаю квартиру, покупали с маткапиталом, доли детям ещё не выделяли.',ck:'sell',must:['Сначала выделить доли у нотариуса — это расходы','Разрешение опеки на продажу','Сделка с долями детей — у нотариуса','Бесплатный юридический аудит']},
+ {t:'Квартира в ипотеке, хочу продать и закрыть кредит.',ck:'sell',must:['Справка об остатке долга','Долг гасится деньгами покупателя, банк снимает обременение','Ипотечный отдел ведёт расчёты с банком']},
+ {t:'Нас трое наследников, хотим продать квартиру.',ck:'sell',must:['Свидетельство о наследстве и регистрация права всех','Все собственники участвуют; кто в другом городе — доверенность или онлайн-подписание','Налог: минимальный срок 3 года с даты открытия наследства']},
+ {t:'Ищем квартиру в новостройке, у нас двое детей, слышали про семейную ипотеку.',ck:'buy',must:['Новостройки без комиссии через Единый центр новостроек','Условия семейной ипотеки — через ипотечный отдел','Проверка застройщика, ДДУ, эскроу','Бронь и актуальные акции']},
+ {t:'Хочу просто узнать, сколько стоит моя квартира.',ck:'sell',must:['Диапазон цены по аналитике, точная — после личного осмотра','Маркетинг-план на 12 площадках и еженедельный отчёт','Договориться об осмотре сегодня']},
+ {t:'Покупаю за наличные, срочно — через месяц переезд.',ck:'buy',must:['Проверка квартиры юристом до задатка','Безопасные расчёты','Подборка сегодня, показы в ближайшие дни','Торг и переговоры веду я']}];
+const CERT_STAGES={c_contact:1,c_needs:5,c_pres:3,c_calc:2,c_objn:2,c_close:2};
+const CERT_SELL=['addr','floor','rooms','state','expect','owners','basis','years','msk','minors','mort','mortLeft','spouse','replan','why','deadline','second','secondPrice'];
+const CERT_BUY=['brooms','seg','district','bimp','who','kids','bdeadline','budget','pay','own','mskSum','approved','anal'];
+const CERT_X={expect:nu('expect','Цена: какую хотите получить?','Клиенту называем диапазон по аналитике, точную рекомендацию — после личного осмотра'),
+ floor:tx('floor','Этаж / этажность'),anal:ck('anal','Показал клиенту аналитику цен по его запросу'),why:mu('why','Цель продажи — для чего продаёте?',['Обмен на большую','Обмен на меньшую','Переезд в другой город','Купили другое жильё','Нужны деньги','Наследство','Другое'])};
+const ALLF={};Object.values(SCH).forEach(l=>l.forEach(it=>{if(!ALLF[it.id])ALLF[it.id]=it;}));
+const pickF=ids=>ids.map(i=>CERT_X[i]||ALLF[i]).filter(Boolean);
+function certFields(){const k=kind();return (k!=='buy'?pickF(CERT_SELL):[]).concat(k!=='sell'?pickF(CERT_BUY):[]);}
+function certChecks(){const f=F(),c=C(),k=kind(),L=[];
+ if(k!=='buy')L.push(['Адрес, этаж',f.addr||f.floor],['Цена: диапазон',num(f.expect)],['Состояние',f.state],['Документы: кто собственник',f.owners||f.basis],['Цель продажи',arr(f.why).length],
+  ['Перепланировка',f.replan],['Обременение',f.mort],['Маткапитал',f.msk],['Доли → нотариус, расходы',f.msk==='Нет'||(f.msk&&num(f.notary))],['Ипотека: остаток',f.mort==='Нет'||num(f.mortLeft)],['Срок продажи / переезда',f.deadline],['Расходы по продаже итого',c.v_calc]);
+ if(k!=='sell')L.push(['Характеристики',arr(f.brooms).length],['Сегмент: вторичка / новостройка / загородка',f.seg],['Инфраструктура',f.district||arr(f.bimp).length],['Потребность: что важно',arr(f.bimp).length],
+  ['Бюджет',num(f.budget)],['Ипотека: 2 документа, ставка ниже',arr(f.pay).length&&(!arr(f.pay).includes('Ипотека')||c.b_mort)],['Цена — аналитика',f.anal],['Расходы по покупке',c.v_calc]);
+ L.push(['Остались вопросы? Резюме',c.cl_q]);
+ return L.map(([t,v])=>[t,!!v]);}
+function ckBar(){const L=certChecks(),d=L.filter(x=>x[1]).length,miss=L.filter(x=>!x[1]).slice(0,6);
+ return `<div class="ckbar${d===L.length?' done':''}"><b>Анкета ${d} из ${L.length}</b>${miss.map(x=>'<span>'+esc(x[0])+'</span>').join('')}${L.length-d>6?'<em class="note">и ещё '+(L.length-d-6)+'</em>':''}</div>`;}
+const OB_CERT=[
+ ['Услуга бывает дешевле, у вас дорого','Имя, с чем сравниваете? Только стоимость останавливает?','Согласен, деньги важны. Вместе с этим посмотрите, что входит: ипотека по ставке ниже банка экономит до 250 тыс., страховка дешевле на 30–40%, юристы бесплатно проверяют документы, маркетинг-план на 12 площадках, а компания даёт гарантийный сертификат — отвечает деньгами. И платите вы только по факту сделки. Согласитесь, это уже не расход, а экономия?'],
+ ['Могу сам продать или купить','Имя, конечно, можете. Был ли у вас опыт сделок? Что для вас важнее — сэкономить на комиссии или продать дороже и безопасно?','Согласен, многие пробуют сами. Вместе с этим самостоятельный продавец обычно больше уступает на торге, а мы ведём переговоры за вас. При детских долях, опеке и ипотеке одна ошибка в документах — и сделка срывается. Мы за это несём ответственность. Согласны, что спокойнее, когда это делает специалист?']];
+let tickT=null;
+function certTimer(){const on=S.cur.type==='cert';$('#ctimer').hidden=!on;if(!on){clearInterval(tickT);tickT=null;return;}
+ const t=S.cur.t||(S.cur.t={left:900,run:false,ts:0});
+ const left=()=>t.run?Math.max(0,t.left-(Date.now()-t.ts)/1000):t.left;
+ const draw=()=>{const l=left(),m=Math.floor(l/60),sec=Math.floor(l%60);$('#clock').textContent=m+':'+String(sec).padStart(2,'0');$('#clock').classList.toggle('late',l<=180);
+  $('#tgo').textContent=t.run?'Пауза':(l<900?'Дальше':'Старт');const el=900-l;let acc=0,now=null;
+  Object.entries(CERT_STAGES).forEach(([id,mn])=>{if(now===null&&el<acc+mn*60)now=id;acc+=mn*60;});
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('now',t.run&&b.dataset.t===now));
+  if(t.run&&l<=0){t.left=0;t.run=false;saveLocal();}};
+ $('#tgo').onclick=()=>{if(t.run){t.left=left();t.run=false;}else{t.run=true;t.ts=Date.now();if(S.tab==='c_case')go('c_contact');}saveLocal();draw();};
+ $('#treset').onclick=()=>{t.left=900;t.run=false;saveLocal();draw();};
+ draw();if(!tickT)tickT=setInterval(draw,500);}
+function certSaysClose(){const k=kind(),L=[`${N()}, для того чтобы приступить к работе, необходимо подписать агентский договор на оказание услуг.`,`Я уже сегодня вас зарегистрирую в личном кабинете, чтобы вы видели мои активности.`];
+ if(k!=='sell')L.push(`А также, как мы с вами договорились, я отправлю вам подборку по интересующим вас вариантам, после договорюсь о просмотрах в назначенный день.`);
+ if(k!=='buy')L.push(`Также приеду сегодня на вашу квартиру${F().second&&F().second!=='Нет'?' и '+esc(F().second.toLowerCase()):''}, посмотрю, чтобы грамотно потом презентовать нашим покупателям. Назначим с вами день для профессиональной фотосессии.`);
+ return L;}
+Object.assign(P,{
+ c_case:()=>{const f=F(),cs=CASES[f.cs];return head('Сертификация · кейс','Выбери кейс, который дали, или тренируйся на случайном. Таймер наверху — запусти, когда клиент «вошёл».')+
+  (cs?`<div class="casecard"><i>${esc(cs.tag||'Кейс '+(f.cs+1))}</i>«${esc(cs.t)}»</div><div class="box"><h3>Обязательно сказать по этому кейсу</h3><ul class="list" style="margin:0;padding-left:20px">${cs.must.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul></div>`:'')+
+  `<div class="box"><h3>Кто пришёл</h3><div class="chips">${[['sell','Продавец'],['buy','Покупатель'],['ex','Продать + купить']].map(([v,l])=>`<button type="button" class="chip${f.ck===v?' on':''}" data-ch="ck" data-m="0" data-v="${v}">${l}</button>`).join('')}</div></div>
+  <div class="box"><h3>Кейсы</h3><div class="row" style="margin-bottom:8px"><button class="ibtn primary" type="button" id="rndCase">Случайный кейс</button></div>
+  <div class="arch">${CASES.map((c,i)=>`<div><span style="white-space:normal">${i+1}. ${esc(c.t)}</span><button class="ibtn" type="button" data-case="${i}">Взять</button></div>`).join('')}</div></div>`;},
+ c_contact:()=>ckBar()+head('1 · Установление контакта','1 минута. Встать, улыбнуться. Дальше весь разговор — по имени.')+
+  says([`Здравствуйте, спасибо что пришли в нашу компанию, меня зовут ${esc(ME().name.split(' ')[0])}, я буду вашим личным специалистом по недвижимости. Как могу к вам обращаться?`,
+   `${N()}, я могу вам предложить чашечку кофе или чай?`,`Чтобы вам было комфортно, предлагаю снять верхнюю одежду.`,
+   `${N()}, наша встреча займёт около 15 минут: я задам несколько вопросов, расскажу, как мы можем помочь, и посчитаем расходы. Договорились?`])+
+  '<div class="box">'+item(tx('name','Имя клиента'))+'</div>'+tip('Помни:','без пауз, ведём диалог. Чаще обращайся по имени.'),
+ c_needs:()=>{const k=kind();return ckBar()+head('2 · Выявление потребностей','5 минут. Открытый вопрос, потом анкета.')+
+  says([`Расскажите, пожалуйста, какая у вас ситуация, с чем вы к нам пришли? Для чего решили ${k==='buy'?'купить':k==='sell'?'продать':'продать и купить'} недвижимость?`])+
+  (k!=='buy'?'<div class="box"><h3>Продажа</h3>'+pickF(CERT_SELL).map(item).join('')+'</div>':'')+(k!=='sell'?'<div class="box"><h3>Покупка</h3>'+pickF(CERT_BUY).map(item).join('')+'</div>':'');},
+ c_pres:()=>{const k=kind();return ckBar()+head('3 · Презентация','3 минуты. Каждую выгоду привязывай к тому, что сказал клиент. Заканчивай вопросом.')+
+  (k!=='buy'?`<div class="say">Правильно сделали, что обратились к нам: наша компания специализируется на продаже недвижимости уже более 20 лет, и мы точно знаем, как продать для вас выгодно и безопасно.</div>`:'')+
+  (k!=='sell'?`<div class="say">${N()}, правильно сделали, что обратились в нашу компанию, я вам могу помочь.</div>`:'')+
+  utpBox(k==='sell'?SELL_UTP:k==='buy'?BUY_UTP:XPRES);},
+ c_calc:()=>{const k=kind();C().v_calc=true;return ckBar()+head('4 · Расчёт расходов','2 минуты. Покажи экран клиенту.')+(k==='sell'?sellCalcHTML():k==='buy'?buyCalcHTML(0):P.xcalc().replace(/^<div><h2>[^<]*<\/h2>(<p class="lead">[^<]*<\/p>)?<\/div>/,''));},
+ c_objn:()=>{const k=kind();return ckBar()+head('5 · Отработка возражений','2 минуты. Эти два — из чек-листа, их дадут почти наверняка.')+objBox(OB_CERT.concat(k==='buy'?OB_BUY.slice(2):OB_SELL.slice(2)));},
+ c_close:()=>{const k=kind(),cl=[['cl_q','Спросил «Остались ли вопросы?» и резюмировал'],['cl_contract','Предложил подписать агентский договор'],['cl_lk','Регистрация в личном кабинете']];
+  if(k!=='sell')cl.push(['cl_podb','Подборка и просмотры']);if(k!=='buy')cl.push(['cl_visit','Выезд на объект сегодня и фотосессия']);
+  return ckBar()+head('6 · Завершение','2 минуты. Резюме — договор — следующие шаги.')+resumeBox()+says(certSaysClose())+
+  '<div class="box"><h3>Отметь, что сказал</h3>'+chkList(cl)+'</div><div class="row"><button class="ibtn primary" type="button" data-goto="map">Показать карту клиента</button></div>';}});
 /* ================= CLIENT MAP ================= */
 function sellDocs(){const f=F(),d=[['Паспорта всех собственников','']];
+ if(isLand(f.second))d.push(['Документы на дом и землю','выписки ЕГРН, межевание']);
  const b={'Купля-продажа':'Договор купли-продажи','Наследство':'Свидетельство о праве на наследство','Приватизация':'Договор приватизации','ДДУ':'ДДУ и акт приёма-передачи','Дарение':'Договор дарения','Мена':'Договор мены'}[f.basis];
  d.push([b||'Документ-основание','']);d.push(['Выписка ЕГРН','закажем сами']);
  if(f.spouse==='Да')d.push(['Нотариальное согласие супруга','или брачный договор']);
  if(f.msk&&f.msk!=='Нет'||f.minors==='Да')d.push(['Свидетельства о рождении детей',''],['Разрешение органов опеки','поможем подготовить']);
  if(f.msk==='Да, доли не выделены')d.push(['Соглашение о выделении долей','у нотариуса']);
+ if(kidsShares(f))d.push(['Нотариальное удостоверение сделки','доли детей — организуем']);
  if(f.mort==='Да')d.push(['Справка об остатке долга','из банка'+(f.mortBank?' '+f.mortBank:'')]);
  if(f.replan&&f.replan!=='Нет')d.push(['Документы на перепланировку','']);
  if(S.cur.type==='ih'&&f.heirsWhere)d.push(['Доверенности наследников из других городов','или онлайн-подписание']);
@@ -659,6 +765,7 @@ function sellSteps(){const f=F(),s=[['Сегодня','Договор и пла�
  if(S.cur.type==='ih'&&f.inhStatus&&f.inhStatus!=='Свидетельство получено, право зарегистрировано')s.push(['Сначала','Оформление наследства','Свидетельство у нотариуса и регистрация права всех наследников — помогаем с документами']);
  s.push([S.cur.type==='ss'?'В течение 3 дней':(f.viewDate||'1–3 дня'),S.cur.type==='ss'?'Профессиональная фотосессия':'Осмотр и фотосессия','Профессиональные фото, продающее описание, аудит документов юристом']);
  s.push(['Старт продажи','Реклама','12 площадок, платные статусы, риелторские чаты, соцсети, баннер, расклейка']);
+ if(f.second&&f.second!=='Нет')s.push(['Параллельно','Продажа: '+f.second.toLowerCase(),'Фото, реклама, документы — начинаем сразу, загородка продаётся дольше']);
  if(f.msk&&f.msk!=='Нет'||f.minors==='Да')s.push(['Параллельно','Опека и доли','Разрешение органов опеки'+(f.msk==='Да, доли не выделены'?' и выделение долей у нотариуса':'')]);
  if(isAlt(f)&&S.cur.type!=='ex')s.push(['Параллельно','Подбор нового жилья','Подборка, просмотры, одобрение ипотеки при необходимости']);
  s.push(['Каждую неделю','Отчёт','Просмотры, звонки, показы, конкуренты — в личном кабинете'],['Через 3 недели','Анализ спроса','Смотрим на цифры и при необходимости корректируем стратегию'],
@@ -679,8 +786,9 @@ function nbSteps(){const f=F(),mo=f.program!=='Без ипотеки',s=[['Се�
  s.push(['Финал','Ключи у вас','Партнёры по ремонту — если нужно']);return s;}
 function exSteps(){const f=F();return [['Сегодня','Договор и план обмена','Агентский договор, личный кабинет, заявка в ипотечный отдел'],
  ['1–3 дня','Фото и реклама вашей квартиры','Фотосессия, описание, аудит документов, 12 площадок'],
+ ...((f.second&&f.second!=='Нет')?[['Параллельно','Продажа: '+f.second.toLowerCase(),'Фото, реклама, документы на дом и землю — начинаем сразу']]:[]),
  ['Параллельно','Одобрение и подборка','Одобрение ипотеки под обмен, подборка нового жилья, показы'],
- ...((f.msk&&f.msk!=='Нет'||f.minors==='Да')?[['Параллельно','Опека и доли','Разрешение опеки: дети получают доли в новом жилье']]:[]),
+ ...(kidsShares(f)?[['Параллельно','Опека и доли','Разрешение опеки, нотариальная сделка: дети получают доли в новом жилье']]:[]),
  ['Покупатель найден','Два задатка','Задаток от покупателя вашей и задаток за новую — согласованные сроки'],
  ['Сделка','Встречная сделка в один день','Продажа и покупка одной цепочкой, безопасные расчёты, регистрация'],['Финал','Переезд','Гарантийный сертификат безопасности компании']];}
 function revSteps(){const f=F(),ch=arr(f.changes),s=[];
@@ -694,7 +802,7 @@ function mapHTML(){const f=F(),t=S.cur.type,k=kind(),fr=f.name?esc(f.name.trim()
  const ava='<img src="'+(ME().photo||MEPHOTO)+'" alt="'+esc(ME().name)+'">';
  let title='Ваш план',goal='',steps=[],docs=[],money=[],extra='',iDo=[],youDo=[];
  if(k==='sell'){title='план продажи';goal=sellGoal();steps=sellSteps();docs=sellDocs();const c=sellCalc();
-  if(c.p)money=[['Цена продажи',c.p],['Комиссия — по факту сделки',c.k],c.m&&['Погашение ипотеки',c.m],c.t&&['Налог, предварительно',c.t],['Вам на руки, ориентир',c.net,1]];
+  if(c.p)money=[['Цена продажи',c.p],c.p2&&['Продажа: '+f.second.toLowerCase(),c.p2],['Комиссия — по факту сделки',c.k+c.k2],c.m&&['Погашение ипотеки',c.m],c.no&&['Нотариус',c.no],c.t&&['Налог, предварительно',c.t],['Вам на руки, ориентир',c.net,1]];
   iDo=['Фотосессия и продающее описание','Реклама на 12 площадках','Звонки, показы и переговоры','Еженедельный отчёт','Проверка покупателя','Договор и сопровождение сделки'];
   youDo=['Подготовить документы из списка','Держать квартиру готовой к показам','Сообщать мне об изменениях планов'];if(f.mort==='Да')youDo.unshift('Заказать в банке справку об остатке долга');}
  if(k==='buy'||k==='nb'){title=k==='nb'?'план покупки новостройки':'план покупки';goal=buyGoal();steps=k==='nb'?nbSteps():buySteps();docs=buyDocs();const b=buyCalc(0);
@@ -703,7 +811,7 @@ function mapHTML(){const f=F(),t=S.cur.type,k=kind(),fr=f.name?esc(f.name.trim()
   youDo=['Подготовить документы из списка','Давать обратную связь по вариантам','Сообщать мне об изменениях планов'];}
  if(k==='ex'){title='план обмена';const s=sellCalc(),b=buyCalc(Math.max(s.net,0));goal=sellGoal().replace(/\.$/,'')+'. '+buyGoal();steps=exSteps();
   docs=sellDocs().concat(buyDocs().filter(d=>!d[0].startsWith('Паспорт')));
-  money=[s.p&&['Продажа вашей',s.p],s.p&&['Вам на руки от продажи',s.net],b.p&&['Покупка новой',b.p],b.mortOn&&b.p&&['Сумма кредита',b.loan],b.mortOn&&num(f.rate)&&['Платёж в месяц, ориентир',b.pm,1]];
+  money=[s.p&&['Продажа вашей',s.p],s.p2&&['Продажа: '+f.second.toLowerCase(),s.p2],s.p&&['Вам на руки от продажи',s.net],b.p&&['Покупка новой',b.p],b.mortOn&&b.p&&['Сумма кредита',b.loan],b.mortOn&&num(f.rate)&&['Платёж в месяц, ориентир',b.pm,1]];
   iDo=['Продажа вашей квартиры: фото, реклама, показы','Подбор нового жилья','Ипотека через наших брокеров','Согласование сроков обеих сделок','Встречная сделка в один день'];
   youDo=['Подготовить документы из списка','Держать квартиру готовой к показам','Давать обратную связь по вариантам'];}
  if(k==='rev'){title='отчёт о продаже';const v=num(f.views),c=num(f.calls),s=num(f.rshows);
@@ -727,7 +835,7 @@ function mapHTML(){const f=F(),t=S.cur.type,k=kind(),fr=f.name?esc(f.name.trim()
 
 /* ================= SUMMARY ================= */
 function exportText(){const f=F(),t=T();if(!t)return'';const L=['Встреча: '+t.label+', '+new Date(S.cur.date).toLocaleDateString('ru-RU')];
- t.tabs.forEach(p=>{const sch=SCH[p]||(p==='walk'?[]:null);const list=(p==='walk'?SCH.obj.concat(SCH.walk):SCH[p]);if(!list)return;
+ t.tabs.forEach(p=>{const sch=SCH[p]||(p==='walk'?[]:null);const list=(p==='walk'?SCH.obj.concat(SCH.walk):p==='c_needs'?certFields():SCH[p]);if(!list)return;
   const rows=list.filter(it=>{const v=f[it.id];return v!==undefined&&v!==''&&!(Array.isArray(v)&&!v.length)&&v!==false;}).map(it=>{let v=f[it.id];if(Array.isArray(v))v=v.join(', ');if(v===true)v='да';if(it.t==='num'&&num(v)>=10000)v=rub(num(v));return it.q.replace(/\?$/,'')+': '+v;});
   if(rows.length){L.push('— '+TL[p]);rows.forEach(r=>L.push(r));}});
  const k=t.kind;
@@ -744,7 +852,7 @@ function portrait(){const f=F(),r=risks();const row=(k,v)=>v?'<div class="it"><d
   '<div class="it"><div class="h" style="margin:0">Риски</div><div class="risks">'+(r.length?r.map(x=>'<div class="risk">'+esc(x)+'</div>').join(''):'<div class="risk ok">Явных рисков пока не видно</div>')+'</div></div>';}
 function archHTML(){if(!S.arch.length)return '<p class="empty">Пока пусто. Встреча сохраняется сюда, когда начинаешь новую.</p>';
  return '<div class="arch">'+S.arch.map((m,i)=>'<div><span>'+new Date(m.date).toLocaleDateString('ru-RU')+' · '+esc((TYPES[m.type]||{}).label||'')+' · '+esc(m.f.name||'Без имени')+'</span><span class="row"><button class="ibtn" type="button" data-open="'+i+'">Открыть</button><button class="ibtn" type="button" data-del="'+i+'">Удалить</button></span></div>').join('')+'</div>';}
-function rail(){const f=F(),k=kind();if(!k)return'';const r=risks();let money='';
+function rail(){const f=F(),k=kind();if(!k)return'';if(S.cur.type==='cert'){const L=certChecks();return `<div class="box"><h3>Анкета · ${L.filter(x=>x[1]).length} из ${L.length}</h3><div class="cklist">${L.map(x=>'<div class="'+(x[1]?'ok':'')+'">'+esc(x[0])+'</div>').join('')}</div></div>`+(F().cs!==undefined&&CASES[F().cs]?`<div class="box"><h3>Кейс</h3><div style="font-size:14px">«${esc(CASES[F().cs].t)}»</div></div>`:'');}const r=risks();let money='';
  if(k==='sell'){const c=sellCalc();if(c.p)money=`<div class="box"><h3>На руки</h3><div style="font-family:var(--display);font-size:20px">${rub(c.net)}</div><div class="note">цена ${rub(c.p)}, комиссия ${rub(c.k)}</div></div>`;}
  if(k==='buy'||k==='nb'||k==='ex'){const b=buyCalc(k==='ex'?Math.max(sellCalc().net,0):0);if(b.p)money=`<div class="box"><h3>${b.mortOn?'Кредит и платёж':'Покупка'}</h3><div style="font-family:var(--display);font-size:20px">${b.mortOn?rub(b.pm)+'/мес':rub(b.p)}</div><div class="note">${b.mortOn?'кредит '+rub(b.loan):'расходы '+rub(b.costs)}</div></div>`;}
  const why=arr(f.why).concat(arr(f.bwhy)),imp=arr(f.important).concat(arr(f.bimp));
@@ -832,7 +940,7 @@ const Sync={state:'off',busy:false,timer:null,err:'',
    G.set('last',Date.now());this.state='ok';this.err='';saveLocal();
    if(curChanged||manual||['start','set','sum'].includes(S.tab))go(S.tab,true);
   }catch(e){this.state=e.code===401?'login':'err';this.err=e.msg||(e.code?'код '+e.code:String(e));
-   if(e.code===403)this.err+=' — проверь, что в Google Cloud включён Google Sheets API';}
+   if(e.code===403)this.err=/scope/i.test(this.err)?'Нет доступа к Диску: нажми «Выйти», войди снова и поставь галочку у пункта про Google Диск':this.err+' — проверь, что в Google Cloud включён Google Sheets API';}
   this.busy=false;this.pill();},
  pill(){const b=$('#cloud');if(!b)return;if(!CLOUD_OK||!G.get('on',false)){b.hidden=true;return;}b.hidden=false;
   const m={ok:['✓ Сохранено','ok'],dirty:['Сохраняю…',''],sync:['Синхронизация…',''],login:['Войти в Google','warn'],err:['Ошибка — повторить','warn'],off:['Облако','']}[this.state]||['Облако',''];
@@ -854,26 +962,32 @@ function setHTML(){const p=ME(),sid=G.get('sid','');
  return head('Настройки','')+`<div class="box"><h3>Облако</h3>${cloud}</div>
   <div class="box"><h3>Профиль агента — для карты клиента</h3>${fld('name','Имя')}${fld('role','Должность и компания')}${fld('phone','Телефон')}${fld('tg','Telegram')}${fld('site','Сайт')}${fld('office','Офис')}
    <div class="it"><div class="q">Фото</div><div class="row"><img src="${p.photo||MEPHOTO}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover"><input type="file" id="photoIn" accept="image/*"><button class="ibtn" type="button" id="photoDel"${(S.profile||{}).photo?'':' hidden'}>Вернуть фото из бренд-кита</button></div></div>
-   <p class="note">Пустое поле — берётся значение по умолчанию (серым).</p></div>`;}
+   <p class="note">Пустое поле — берётся значение по умолчанию (серым).</p></div>
+  <div class="box"><h3>Сертификация</h3><div class="it"><label class="chk"><input type="checkbox" id="certDone"${S.profile.certDone?' checked':''}><span>Сертификация пройдена — скрыть модуль на стартовом экране</span></label></div></div>
+  <div class="box"><h3>Офис и тарифы комиссии</h3>${[['sPct','Продавец до 8 млн, %'],['sMin','Продавец: не менее, ₽'],['s8','Продавец от 8 млн, %'],['bPct','Покупатель, %'],['bMin','Покупатель: не менее, ₽'],['zBase','Загородка: фикс, ₽'],['zPct','Загородка: плюс %'],['exD','Скидка на покупку при обмене, %'],['gp','Госпошлина по умолчанию, ₽']].map(([k,l])=>`<div class="it"><div class="q">${l}</div><input type="text" class="num" inputmode="decimal" id="tf-${k}" data-tf="${k}" value="${esc(((S.profile.tf||{})[k])||'')}" placeholder="${TF_DEF[k]}" autocomplete="off"></div>`).join('')}
+   <p class="note">Пусто — тарифы офиса Кемерово по умолчанию (серым). Для другого офиса впиши свои.</p></div>`;}
 function bindSet(){const l=$('#loginBtn');if(l)l.onclick=()=>{if(!cid()){go('set');setTimeout(()=>{const c=$('#cidIn');if(c)c.focus();},50);return;}Sync.signIn(G.get('on',false)?'':'consent');};
  const s=$('#syncNow');if(s)s.onclick=()=>Sync.run(true);
+ const cd=$('#certDone');if(cd)cd.onchange=()=>{S.profile.certDone=cd.checked;S.profile.updated=Date.now();save();Sync.later();};
  const o=$('#outBtn');if(o)o.onclick=()=>Sync.signOut(false);
  const w=$('#wipeBtn');if(w)w.onclick=()=>{if(w.dataset.armed)Sync.signOut(true);else{w.dataset.armed=1;w.textContent='Точно стереть с устройства?';}};}
 
 /* ================= NAV ================= */
 function renderTabs(){const tabs=$('#tabs');const list=T()?T().tabs:['start'];let n=0;
- tabs.innerHTML=(T()?['start'].concat(list):list).map(id=>{const lbl=id==='start'?'Тип встречи':TL[id];const numb=(id==='start'||id==='map'||id==='sum')?'':'<b>'+(++n)+'</b>';
+ tabs.innerHTML=(T()?['start'].concat(list):list).map(id=>{const lbl=id==='start'?'Тип встречи':TL[id];const numb=(id==='start'||id==='map'||id==='sum'||id==='c_case')?'':'<b>'+(++n)+'</b>';
   return `<button type="button" class="tab${id==='map'?' client':''}${id===S.tab?' active':''}" data-t="${id}">${numb}${lbl}</button>`;}).join('');}
 function go(id,keep){if(!T()&&id!=='start'&&id!=='set')id='start';S.tab=id;save();const y=window.scrollY;
  $('#panel').innerHTML=P[id]();$('#layout').classList.toggle('wide',id==='map'||id==='start'||id==='set');renderTabs();refreshSide();bind();
  const a=$('#tabs .active');if(a&&!keep)a.scrollIntoView({block:'nearest',inline:'center'});window.scrollTo({top:keep?y:0});}
-function refreshSide(){$('#rail').innerHTML=rail();const f=F();$('#typechip').hidden=!T();$('#typechip').textContent=T()?T().label:'';
+function refreshSide(){$('#rail').innerHTML=rail();certTimer();const f=F();$('#typechip').hidden=!T();$('#typechip').textContent=T()?T().label:'';
  $('#who').innerHTML=f.name?'<b>'+esc(f.name)+'</b>'+(f.addr?' · '+esc(f.addr):''):(T()?'Новая встреча':'');}
 function startType(k){if(Object.keys(F()).length&&S.cur.type)S.arch.unshift(S.cur);S.cur=blank(k);save(true);go(TYPES[k].tabs[0]);}
 
 /* ================= EVENTS ================= */
 document.addEventListener('click',e=>{
  const tb=e.target.closest('.tab');if(tb){go(tb.dataset.t);return;}
+ const gt=e.target.closest('[data-goto]');if(gt){go(gt.dataset.goto);return;}
+ const cs=e.target.closest('[data-case]');if(cs||e.target.id==='rndCase'){const i=cs?+cs.dataset.case:Math.floor(Math.random()*CASES.length);F().cs=i;F().ck=CASES[i].ck;save(true);go('c_case',true);return;}
  const tc=e.target.closest('[data-type]');if(tc){startType(tc.dataset.type);return;}
  const b=e.target.closest('[data-ch]');if(b){const k=b.dataset.ch,v=b.dataset.v,f=F();
   if(b.dataset.m==='1'){const a=arr(f[k]);f[k]=a.includes(v)?a.filter(x=>x!==v):a.concat(v);}else f[k]=f[k]===v?'':v;save(true);go(S.tab,true);return;}
@@ -889,10 +1003,11 @@ document.addEventListener('change',e=>{const t=e.target;
  if(t.id==='photoIn'&&t.files[0]){const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const cv=document.createElement('canvas'),s=240;cv.width=cv.height=s;const m=Math.min(img.width,img.height);
   cv.getContext('2d').drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,s,s);S.profile.photo=cv.toDataURL('image/jpeg',.85);S.profile.updated=Date.now();save();Sync.later();go('set',true);};img.src=r.result;};r.readAsDataURL(t.files[0]);}});
 let tmr=null;
-document.addEventListener('input',e=>{const t=e.target;if(t.dataset.p){S.profile[t.dataset.p]=t.value;S.profile.updated=Date.now();save();Sync.later();return;}
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset.tf){S.profile.tf=S.profile.tf||{};S.profile.tf[t.dataset.tf]=t.value;S.profile.updated=Date.now();save();Sync.later();return;}
+ if(t.dataset.p){S.profile[t.dataset.p]=t.value;S.profile.updated=Date.now();save();Sync.later();return;}
  if(t.id==='cidIn'){G.set('cid',t.value.trim());return;}
  if(t.dataset.k&&t.type!=='checkbox'){F()[t.dataset.k]=t.value;save(true);refreshSide();
- if(/calc|price|rstats|rtalk|bmoney/.test(S.tab)){clearTimeout(tmr);tmr=setTimeout(()=>{const id=t.id,pos=t.selectionStart;go(S.tab,true);const n=document.getElementById(id);if(n){n.focus();try{n.setSelectionRange(pos,pos);}catch(x){}}},700);}}});
+ if(/calc|price|rstats|rtalk|bmoney|c_needs/.test(S.tab)){clearTimeout(tmr);tmr=setTimeout(()=>{const id=t.id,pos=t.selectionStart;go(S.tab,true);const n=document.getElementById(id);if(n){n.focus();try{n.setSelectionRange(pos,pos);}catch(x){}}},700);}}});
 function bind(){const c=$('#copyOut');if(c)c.onclick=()=>{const t=$('#out').textContent,ok=()=>{$('#copied').hidden=false;setTimeout(()=>$('#copied').hidden=true,1500);},
   sel=()=>{const r=document.createRange();r.selectNodeContents($('#out'));const s=getSelection();s.removeAllRanges();s.addRange(r);};try{navigator.clipboard.writeText(t).then(ok,sel);}catch(x){sel();}};
  const p=$('#printMap');if(p)p.onclick=()=>window.print();
