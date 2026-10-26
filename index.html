@@ -205,7 +205,7 @@ details.obj .in em{font-style:normal;color:var(--muted);font-size:12px;display:b
 
 </head><body>
 <style>
-.cloud.ok{color:var(--ok)}.cloud.warn{color:var(--accent);border-color:var(--accent)}
+.cloud.ok{color:var(--ok)}.cloud.pend{opacity:.55}.cloud.warn{color:var(--accent);border-color:var(--accent)}
 a.ibtn{text-decoration:none;color:var(--fg);display:inline-block}
 .ctimer{display:flex;align-items:center;gap:6px}
 .clock{font-family:var(--display);font-weight:500;font-size:18px;font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
@@ -852,7 +852,7 @@ function portrait(){const f=F(),r=risks();const row=(k,v)=>v?'<div class="it"><d
   '<div class="it"><div class="h" style="margin:0">Риски</div><div class="risks">'+(r.length?r.map(x=>'<div class="risk">'+esc(x)+'</div>').join(''):'<div class="risk ok">Явных рисков пока не видно</div>')+'</div></div>';}
 function archHTML(){if(!S.arch.length)return '<p class="empty">Пока пусто. Встреча сохраняется сюда, когда начинаешь новую.</p>';
  return '<div class="arch">'+S.arch.map((m,i)=>'<div><span>'+new Date(m.date).toLocaleDateString('ru-RU')+' · '+esc((TYPES[m.type]||{}).label||'')+' · '+esc(m.f.name||'Без имени')+'</span><span class="row"><button class="ibtn" type="button" data-open="'+i+'">Открыть</button><button class="ibtn" type="button" data-del="'+i+'">Удалить</button></span></div>').join('')+'</div>';}
-function rail(){const f=F(),k=kind();if(!k)return'';if(S.cur.type==='cert'){const L=certChecks();return `<div class="box"><h3>Анкета · ${L.filter(x=>x[1]).length} из ${L.length}</h3><div class="cklist">${L.map(x=>'<div class="'+(x[1]?'ok':'')+'">'+esc(x[0])+'</div>').join('')}</div></div>`+(F().cs!==undefined&&CASES[F().cs]?`<div class="box"><h3>Кейс</h3><div style="font-size:14px">«${esc(CASES[F().cs].t)}»</div></div>`:'');}const r=risks();let money='';
+function rail(){const f=F(),k=kind();if(!k)return'';if(S.cur.type==='cert'){const L=certChecks();return `<div class="box"><h3>Анкета · ${L.filter(x=>x[1]).length} из ${L.length}</h3><div class="cklist">${L.map(x=>'<div class="'+(x[1]?'ok':'')+'">'+esc(x[0])+'</div>').join('')}</div></div>`+(F().cs!==undefined&&CASES[F().cs]?`<div class="box"><h3>Кейс</h3><div style="font-size:14px">«${esc(CASES[F().cs].t)}»</div><div class="note" style="margin-top:6px">Анкета: ${({sell:"продавец",buy:"покупатель",ex:"продать + купить"})[kind()]}${CASES[F().cs].ck!==kind()?' · <b style="color:var(--accent)">не совпадает с кейсом — поправь во вкладке «Кейс»</b>':''}</div></div>`:'');}const r=risks();let money='';
  if(k==='sell'){const c=sellCalc();if(c.p)money=`<div class="box"><h3>На руки</h3><div style="font-family:var(--display);font-size:20px">${rub(c.net)}</div><div class="note">цена ${rub(c.p)}, комиссия ${rub(c.k)}</div></div>`;}
  if(k==='buy'||k==='nb'||k==='ex'){const b=buyCalc(k==='ex'?Math.max(sellCalc().net,0):0);if(b.p)money=`<div class="box"><h3>${b.mortOn?'Кредит и платёж':'Покупка'}</h3><div style="font-family:var(--display);font-size:20px">${b.mortOn?rub(b.pm)+'/мес':rub(b.p)}</div><div class="note">${b.mortOn?'кредит '+rub(b.loan):'расходы '+rub(b.costs)}</div></div>`;}
  const why=arr(f.why).concat(arr(f.bwhy)),imp=arr(f.important).concat(arr(f.bimp));
@@ -912,7 +912,7 @@ const Sync={state:'off',busy:false,timer:null,err:'',
   if(t)try{await fetch('https://oauth2.googleapis.com/revoke?token='+t,{method:'POST'});}catch(e){}
   if(wipe){try{localStorage.removeItem('vstrechi2');}catch(e){}S={cur:blank(''),arch:[],tab:'start',photo:'',profile:{},del:{}};saveLocal();}
   this.state='off';this.pill();go('start');},
- later(){if(!this.on())return;this.state='dirty';this.pill();clearTimeout(this.timer);this.timer=setTimeout(()=>this.run(),2500);},
+ later(){if(!this.on())return;this.pending=true;if(this.state==='off')this.state='ok';this.pill();clearTimeout(this.timer);this.timer=setTimeout(()=>this.run(),15000);},
  boot(){if(!CLOUD_OK)return;
   if(/access_token=|error=/.test(location.hash)){const p=new URLSearchParams(location.hash.slice(1));history.replaceState(null,'',location.pathname+location.search);
    if(p.get('state')===G.get('state','')){if(p.get('access_token')){G.set('tok',{t:p.get('access_token'),exp:Date.now()+(+p.get('expires_in')||3600)*1000});G.set('on',true);G.set('needTap',false);
@@ -920,9 +920,10 @@ const Sync={state:'off',busy:false,timer:null,err:'',
     else G.set('needTap',true);}}
   if(this.on()){if(token())setTimeout(()=>this.run(),300);else if(!G.get('needTap',false)&&Date.now()-G.get('try',0)>10*60000)this.signIn('none');else{this.state='login';}}
   this.pill();
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&this.pending&&token())this.run();});
   window.addEventListener('focus',()=>{if(this.on()&&token()&&Date.now()-(G.get('last',0))>60000)this.run();});},
  async run(manual){if(!this.on()||this.busy)return;if(!token()){this.state='login';this.pill();return;}
-  this.busy=true;this.state='sync';this.pill();
+  this.busy=true;clearTimeout(this.timer);this.pending=false;this.syncing=true;this.pill();
   try{const R=await Store.readAll(),map={};
    const local=[S.cur].concat(S.arch).filter(m=>m&&m.type);
    local.forEach(m=>{map[m.id]=m;});
@@ -937,14 +938,16 @@ const Sync={state:'off',busy:false,timer:null,err:'',
    Object.keys(S.del).forEach(id=>{if(!map[id]||map[id].deleted)delete S.del[id];});
    if(R.profile&&(R.profile.updated||0)>(S.profile.updated||0))S.profile=R.profile;
    await Store.writeAll(all.sort((a,b)=>a.id-b.id),S.profile);
-   G.set('last',Date.now());this.state='ok';this.err='';saveLocal();
+   G.set('last',Date.now());this.state='ok';this.err='';this.syncing=false;saveLocal();
    if(curChanged||manual||['start','set','sum'].includes(S.tab))go(S.tab,true);
-  }catch(e){this.state=e.code===401?'login':'err';this.err=e.msg||(e.code?'код '+e.code:String(e));
+  }catch(e){this.syncing=false;this.pending=true;this.state=e.code===401?'login':'err';this.err=e.msg||(e.code?'код '+e.code:String(e));
    if(e.code===403)this.err=/scope/i.test(this.err)?'Нет доступа к Диску: нажми «Выйти», войди снова и поставь галочку у пункта про Google Диск':this.err+' — проверь, что в Google Cloud включён Google Sheets API';}
   this.busy=false;this.pill();},
  pill(){const b=$('#cloud');if(!b)return;if(!CLOUD_OK||!G.get('on',false)){b.hidden=true;return;}b.hidden=false;
-  const m={ok:['✓ Сохранено','ok'],dirty:['Сохраняю…',''],sync:['Синхронизация…',''],login:['Войти в Google','warn'],err:['Ошибка — повторить','warn'],off:['Облако','']}[this.state]||['Облако',''];
-  b.textContent=m[0];b.className='ibtn cloud '+m[1];b.title=this.err||'';}};
+  const m={ok:['✓ Сохранено','ok'],login:['Войти в Google','warn'],err:['Ошибка — повторить','warn'],off:['Облако','']}[this.state]||['✓ Сохранено','ok'];
+  const quiet=this.state==='ok'||this.state==='off';
+  b.textContent=m[0];b.className='ibtn cloud '+m[1]+(quiet&&(this.pending||this.syncing)?' pend':'');
+  b.title=this.err||(this.pending?'Сохранено на устройстве, в таблицу уйдёт через несколько секунд':this.syncing?'Отправляю в таблицу…':'Всё в Google-таблице');}};
 
 function loginCard(){if(!CLOUD_OK||G.get('on',false))return '';
  return `<div class="box" style="border-color:var(--accent)"><h3>Вход</h3><p style="margin:0 0 10px">Войди через рабочий Google — встречи будут на телефоне и на любом компьютере, а данные лягут в твою Google-таблицу.</p>
@@ -990,7 +993,7 @@ document.addEventListener('click',e=>{
  const cs=e.target.closest('[data-case]');if(cs||e.target.id==='rndCase'){const i=cs?+cs.dataset.case:Math.floor(Math.random()*CASES.length);F().cs=i;F().ck=CASES[i].ck;save(true);go('c_case',true);return;}
  const tc=e.target.closest('[data-type]');if(tc){startType(tc.dataset.type);return;}
  const b=e.target.closest('[data-ch]');if(b){const k=b.dataset.ch,v=b.dataset.v,f=F();
-  if(b.dataset.m==='1'){const a=arr(f[k]);f[k]=a.includes(v)?a.filter(x=>x!==v):a.concat(v);}else f[k]=f[k]===v?'':v;save(true);go(S.tab,true);return;}
+  if(b.dataset.m==='1'){const a=arr(f[k]);f[k]=a.includes(v)?a.filter(x=>x!==v):a.concat(v);}else f[k]=(f[k]===v&&k!=='ck')?'':v;save(true);go(S.tab,true);return;}
  const o=e.target.closest('[data-open]');if(o){const i=+o.dataset.open,m=S.arch.splice(i,1)[0];if(S.cur.type&&Object.keys(F()).length)S.arch.unshift(S.cur);S.cur=m;save();go(T().tabs[0]);return;}
  const d=e.target.closest('[data-del]');if(d){if(d.dataset.armed){const m=S.arch.splice(+d.dataset.del,1)[0];if(m)S.del[m.id]=Date.now();save();Sync.later();go(S.tab,true);}else{d.dataset.armed=1;d.textContent='Точно удалить?';}return;}
  if(e.target.id==='sample'){startType('so');Object.assign(F(),{name:'Пример: Ольга',phone:'+7 900 000-00-00',addr:'ул. Пример, 10',src:'Авито',adprice:'4600000',days:'45',mktMin:'4100000',mktMax:'4400000',
@@ -1007,6 +1010,7 @@ document.addEventListener('input',e=>{const t=e.target;if(t.dataset.tf){S.profil
  if(t.dataset.p){S.profile[t.dataset.p]=t.value;S.profile.updated=Date.now();save();Sync.later();return;}
  if(t.id==='cidIn'){G.set('cid',t.value.trim());return;}
  if(t.dataset.k&&t.type!=='checkbox'){F()[t.dataset.k]=t.value;save(true);refreshSide();
+ if(t.dataset.k==='name')document.querySelectorAll('.nm').forEach(n=>{n.textContent=t.value.trim()||'Имя';});
  if(/calc|price|rstats|rtalk|bmoney|c_needs/.test(S.tab)){clearTimeout(tmr);tmr=setTimeout(()=>{const id=t.id,pos=t.selectionStart;go(S.tab,true);const n=document.getElementById(id);if(n){n.focus();try{n.setSelectionRange(pos,pos);}catch(x){}}},700);}}});
 function bind(){const c=$('#copyOut');if(c)c.onclick=()=>{const t=$('#out').textContent,ok=()=>{$('#copied').hidden=false;setTimeout(()=>$('#copied').hidden=true,1500);},
   sel=()=>{const r=document.createRange();r.selectNodeContents($('#out'));const s=getSelection();s.removeAllRanges();s.addRange(r);};try{navigator.clipboard.writeText(t).then(ok,sel);}catch(x){sel();}};
